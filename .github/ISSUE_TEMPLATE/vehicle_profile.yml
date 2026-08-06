@@ -1,0 +1,28 @@
+name: Vehicle profile request
+description: Ask for (or contribute) a worked hunt.config.ts for a specific vehicle
+labels: ["vehicle-profile"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The shipped config describes a Toyota Tacoma. Worked configs for other
+        vehicles are the single most useful contribution to this project.
+  - type: input
+    id: vehicle
+    attributes:
+      label: Vehicle
+      placeholder: "Ford F-150, 2018-2024"
+    validations:
+      required: true
+  - type: textarea
+    id: quirks
+    attributes:
+      label: What's model-specific about it
+      description: |
+        Trims never sold in 2WD? Colour names that don't contain the colour?
+        Trim ladder worth scoring? A redesign year that changes value?
+  - type: textarea
+    id: config
+    attributes:
+      label: Your config, if you have one working
+      render: typescript

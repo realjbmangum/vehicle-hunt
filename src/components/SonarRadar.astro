@@ -1,10 +1,19 @@
 ---
+import { HUNT } from "../../hunt.config";
+
 interface Props {
   size?: number;
   caption?: string | null;
   bearing?: string | null;
 }
 const { size = 280, caption = "SCANNING", bearing = null } = Astro.props;
+
+// Corner stamp. Falls back to the ZIP when no coordinates are configured,
+// so the placeholder never invents a location.
+const stamp =
+  HUNT.location.latitude !== null && HUNT.location.longitude !== null
+    ? `${HUNT.location.latitude.toFixed(2)}\u00b0N \u00b7 ${Math.abs(HUNT.location.longitude).toFixed(2)}\u00b0W`
+    : HUNT.location.zip;
 ---
 
 <div class="sonar" style={`width:${size}px;height:${size}px`} role="img" aria-label="Vehicle photo unavailable — radar scan placeholder">
@@ -98,7 +107,7 @@ const { size = 280, caption = "SCANNING", bearing = null } = Astro.props;
 
     <!-- Coordinate corner stamp -->
     <g transform="translate(8 188)" font-family="var(--font-mono)" font-size="5" fill="var(--color-coyote)" opacity="0.6">
-      <text>35.18°N · 80.73°W</text>
+      <text>{stamp}</text>
     </g>
     {bearing && (
       <g transform="translate(192 188)" font-family="var(--font-mono)" font-size="5" fill="var(--color-coyote)" opacity="0.6" text-anchor="end">
