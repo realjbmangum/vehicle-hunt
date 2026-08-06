@@ -1,0 +1,145 @@
+---
+interface Stage {
+  key: string;
+  label: string;
+  count: number;
+  tone: "sage" | "caution" | "rust" | "stop" | "go" | "muted";
+}
+
+interface Props {
+  stages: Stage[];
+}
+
+const { stages } = Astro.props;
+
+const toneColors: Record<Stage["tone"], string> = {
+  go: "var(--color-go)",
+  caution: "var(--color-caution)",
+  rust: "var(--color-rust)",
+  stop: "var(--color-stop)",
+  sage: "var(--color-sage)",
+  muted: "var(--color-line-strong)",
+};
+---
+
+<div class="pipeline">
+  <svg class="trail" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+    <line
+      x1="2" y1="4" x2="98" y2="4"
+      stroke="var(--color-line)"
+      stroke-width="0.4"
+      stroke-dasharray="2 2"
+    />
+  </svg>
+
+  <ol class="stages">
+    {stages.map((stage, i) => (
+      <li class="stage" style={`--marker:${toneColors[stage.tone]}`}>
+        <div class="dot">
+          <span class="ring" />
+          <span class="core" />
+          <span class="seq">{String(i + 1).padStart(2, "0")}</span>
+        </div>
+        <div class="label-wrap">
+          <span class="label">{stage.label}</span>
+          <span class="count">{String(stage.count).padStart(2, "0")}</span>
+        </div>
+      </li>
+    ))}
+  </ol>
+</div>
+
+<style>
+  .pipeline {
+    position: relative;
+    padding: 28px 8px 12px;
+  }
+  .trail {
+    position: absolute;
+    top: 38px;
+    left: 8%;
+    right: 8%;
+    height: 8px;
+    width: 84%;
+    pointer-events: none;
+  }
+  .stages {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+  }
+  .dot {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 50%;
+    background: var(--color-base);
+  }
+  .core {
+    width: 8px;
+    height: 8px;
+    background: var(--marker, var(--color-line-strong));
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--color-base);
+    z-index: 1;
+  }
+  .seq {
+    position: absolute;
+    top: -16px;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--color-coyote);
+    opacity: 0.7;
+    letter-spacing: 0.05em;
+  }
+  .label-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .label {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-bone-mute);
+  }
+  .count {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--color-bone);
+    font-weight: 600;
+    line-height: 1;
+  }
+  @media (max-width: 640px) {
+    .pipeline { padding: 20px 4px 8px; }
+    .stages { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+    .label { font-size: 0.5625rem; letter-spacing: 0.06em; }
+    .seq { font-size: 0.5rem; top: -14px; }
+    .count { font-size: 0.875rem; }
+    .trail { left: 5%; right: 5%; width: 90%; }
+  }
+</style>

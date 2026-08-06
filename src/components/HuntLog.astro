@@ -1,0 +1,151 @@
+---
+import type { Listing } from "../lib/dealScore";
+
+interface Props {
+  listing: Listing;
+}
+const { listing: l } = Astro.props;
+
+// Build chronological hunt-log entries from whatever fields we have
+type Entry = { when: string; tone: "neutral" | "rust" | "sage" | "go" | "caution"; text: string };
+const entries: Entry[] = [];
+
+const fmtDate = (s: string | null | undefined) => {
+  if (!s) return null;
+  try {
+    const d = new Date(s);
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch { return null; }
+};
+
+// Ingested
+const ingestedDate = fmtDate((l as any).ingested_at) || fmtDate(l.created_at);
+if (ingestedDate) {
+  const src = (l as any).source ? ` from ${String((l as any).source).split(",")[0]}` : "";
+  entries.push({ when: ingestedDate, tone: "rust", text: `First seen${src}` });
+}
+
+// Price history
+let priceHistory: Array<{ price: number; at: string }> = [];
+try {
+  if ((l as any).price_history) priceHistory = JSON.parse((l as any).price_history);
+} catch {}
+if (priceHistory.length > 1) {
+  const first = priceHistory[0];
+  const last = priceHistory[priceHistory.length - 1];
+  if (last.price < first.price) {
+    entries.push({
+      when: fmtDate(last.at) || "—",
+      tone: "go",
+      text: `Price dropped $${(first.price - last.price).toLocaleString()}`,
+    });
+  } else if (last.price > first.price) {
+    entries.push({
+      when: fmtDate(last.at) || "—",
+      tone: "caution",
+      text: `Price up $${(last.price - first.price).toLocaleString()}`,
+    });
+  }
+}
+
+// Score-derived field notes
+if (l.mileage && l.mileage < 30000) entries.push({ when: "—", tone: "go", text: "Low-mileage win" });
+if (l.trim && /TRD/.test(l.trim)) entries.push({ when: "—", tone: "sage", text: "Preferred trim" });
+if ((l.drivetrain || "").toUpperCase().includes("4WD")) entries.push({ when: "—", tone: "sage", text: "4WD confirmed" });
+if (l.price && l.price < 32000) entries.push({ when: "—", tone: "go", text: "Under $32k threshold" });
+
+// Last seen / status
+const lastSeen = fmtDate((l as any).last_seen_at);
+if (lastSeen) {
+  entries.push({ when: lastSeen, tone: "neutral", text: "Last refreshed in feed" });
+}
+if (l.status === "contacted") entries.push({ when: "—", tone: "caution", text: "Inquiry sent" });
+if (l.status === "scheduled") entries.push({ when: "—", tone: "rust", text: "Visit scheduled" });
+---
+
+<aside class="hunt-log" aria-label="Hunt log">
+  <header class="hl-head">
+    <span class="hl-title">Hunt Log</span>
+    <span class="hl-meta font-mono">{entries.length.toString().padStart(2, "0")} ENTRIES</span>
+  </header>
+  <ol class="hl-entries">
+    {entries.length === 0 ? (
+      <li class="hl-empty">No notable activity yet.</li>
+    ) : entries.slice(0, 6).map((e) => (
+      <li class={`hl-entry hl-entry--${e.tone}`}>
+        <span class="hl-when font-mono">{e.when}</span>
+        <span class="hl-text">{e.text}</span>
+      </li>
+    ))}
+  </ol>
+</aside>
+
+<style>
+  .hunt-log {
+    background: var(--color-base);
+    border: 1px solid var(--color-line-strong);
+    border-radius: 3px;
+    padding: 16px 18px 14px;
+    position: relative;
+  }
+  .hunt-log::before {
+    content: "HUNT LOG";
+    position: absolute;
+    top: -8px;
+    left: 16px;
+    background: var(--color-card);
+    padding: 0 8px;
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    color: var(--color-coyote);
+  }
+  .hl-head { display: none; } /* using ::before instead */
+  .hl-entries {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 0.8125rem;
+  }
+  .hl-entry {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    gap: 10px;
+    align-items: baseline;
+    line-height: 1.35;
+    position: relative;
+    padding-left: 14px;
+  }
+  .hl-entry::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 7px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--color-line-strong);
+    box-shadow: 0 0 0 2px var(--color-base);
+  }
+  .hl-entry--rust::before { background: var(--color-rust); }
+  .hl-entry--go::before { background: var(--color-go); }
+  .hl-entry--sage::before { background: var(--color-sage); }
+  .hl-entry--caution::before { background: var(--color-caution); }
+  .hl-when {
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    color: var(--color-coyote);
+    opacity: 0.85;
+    text-transform: uppercase;
+  }
+  .hl-text { color: var(--color-bone-mute); }
+  .hl-empty {
+    color: var(--color-muted);
+    font-style: italic;
+    padding: 8px 0;
+    list-style: none;
+  }
+</style>

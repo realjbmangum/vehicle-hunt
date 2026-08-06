@@ -1,0 +1,92 @@
+---
+import { HUNT } from "../../hunt.config";
+interface Props {
+  city?: string | null;
+  zip?: string;
+  miles?: number | null;
+  bearing?: string;   // "N" "NE" "E" "SE" "S" "SW" "W" "NW"
+  fallback?: string;  // when we don't know, e.g. "Carvana — delivered"
+}
+
+const { city, zip = HUNT.location.zip, miles = null, bearing, fallback } = Astro.props;
+
+// Best-effort bearing inference from city if not provided
+const cityBearings: Record<string, string> = {
+  "concord": "NE",
+  "kannapolis": "NE",
+  "salisbury": "NE",
+  "huntersville": "N",
+  "cornelius": "N",
+  "mooresville": "N",
+  "davidson": "N",
+  "matthews": "E",
+  "monroe": "E",
+  "indian trail": "E",
+  "rock hill": "S",
+  "fort mill": "S",
+  "york": "S",
+  "gastonia": "W",
+  "shelby": "W",
+  "hickory": "NW",
+  "lincolnton": "NW",
+  "asheville": "W",
+  "winston-salem": "NE",
+  "greensboro": "NE",
+  "charlotte": "—",
+  "uptown": "—",
+};
+
+const inferred = (() => {
+  if (bearing) return bearing;
+  if (!city) return null;
+  const key = city.toLowerCase().split(",")[0].trim();
+  return cityBearings[key] || null;
+})();
+---
+
+{(miles != null && inferred) ? (
+  <span class="distance">
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+      <circle cx="5" cy="5" r="4" fill="none" stroke="currentColor" stroke-opacity="0.6" />
+      <circle cx="5" cy="5" r="1" fill="currentColor" />
+    </svg>
+    <span class="num">{miles}</span><span class="unit">mi</span>
+    <span class="bearing">{inferred}</span>
+    <span class="of">of</span>
+    <span class="zip">{zip}</span>
+  </span>
+) : fallback ? (
+  <span class="distance distance--fallback">{fallback}</span>
+) : (
+  <span class="distance distance--unknown">distance unknown</span>
+)}
+
+<style>
+  .distance {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-coyote);
+    letter-spacing: 0.06em;
+    line-height: 1;
+  }
+  .distance svg { color: var(--color-coyote); opacity: 0.85; }
+  .num { color: var(--color-bone); font-weight: 600; }
+  .unit { opacity: 0.6; margin-right: 4px; }
+  .bearing {
+    background: color-mix(in oklch, var(--color-coyote) 18%, var(--color-card-elev));
+    color: oklch(0.92 0.07 80);
+    padding: 2px 5px;
+    margin-left: 2px;
+    font-weight: 700;
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    letter-spacing: 0.1em;
+  }
+  .of { opacity: 0.45; }
+  .zip { color: var(--color-bone-mute); font-weight: 500; }
+  .distance--fallback, .distance--unknown { color: var(--color-muted); font-style: normal; }
+  .distance--unknown { opacity: 0.7; }
+</style>

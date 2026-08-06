@@ -1,0 +1,378 @@
+---
+import Layout from "../../layouts/Layout.astro";
+---
+
+<Layout title="Add Listing — Tacoma Field Tracker" eyebrow="Manual Entry · Field Form">
+  <a href="/listings" class="back-link">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 9 L4 6 L7 3" stroke-linecap="square" /></svg>
+    All Listings
+  </a>
+
+  <header class="form-head">
+    <h1 class="heading-xl form-title">Add Listing</h1>
+    <p class="form-sub">Manual entry — for trucks the email pipeline didn't catch.</p>
+  </header>
+
+  <form id="listing-form" class="form-stack">
+
+    <fieldset class="card grain form-card">
+      <legend class="form-legend">§ 01 · Vehicle</legend>
+      <div class="form-grid">
+        <div class="field">
+          <label for="f-year">Year *</label>
+          <select id="f-year" name="year" required>
+            <option value="">—</option>
+            <option value="2023">2023</option>
+            <option value="2022">2022</option>
+            <option value="2021">2021</option>
+            <option value="2020">2020</option>
+            <option value="2019">2019</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-trim">Trim</label>
+          <select id="f-trim" name="trim">
+            <option value="">—</option>
+            <option value="SR">SR</option>
+            <option value="SR5">SR5</option>
+            <option value="TRD Sport">TRD Sport</option>
+            <option value="TRD Off-Road">TRD Off-Road</option>
+            <option value="Limited">Limited</option>
+            <option value="TRD Pro">TRD Pro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-price">Price (USD) *</label>
+          <input id="f-price" type="number" name="price" required placeholder="35000" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label for="f-mileage">Mileage</label>
+          <input id="f-mileage" type="number" name="mileage" placeholder="45000" inputmode="numeric" />
+        </div>
+        <div class="field">
+          <label for="f-vin">VIN</label>
+          <input id="f-vin" type="text" name="vin" placeholder="3TYAX5GN..." maxlength="17" />
+        </div>
+        <div class="field">
+          <label for="f-color">Color</label>
+          <input id="f-color" type="text" name="color" placeholder="Magnetic Gray" />
+        </div>
+        <div class="field">
+          <label for="f-drivetrain">Drivetrain</label>
+          <select id="f-drivetrain" name="drivetrain">
+            <option value="4WD">4WD</option>
+            <option value="2WD">2WD</option>
+            <option value="AWD">AWD</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-cab">Cab</label>
+          <select id="f-cab" name="cab_type">
+            <option value="Double Cab">Double Cab</option>
+            <option value="Access Cab">Access Cab</option>
+            <option value="Crew Cab">Crew Cab</option>
+            <option value="Regular Cab">Regular Cab</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-bed">Bed</label>
+          <select id="f-bed" name="bed_size">
+            <option value="Short">Short (5')</option>
+            <option value="Long">Long (6')</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="card grain form-card">
+      <legend class="form-legend">§ 02 · Source</legend>
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="f-dealer">Dealer Name</label>
+          <input id="f-dealer" type="text" name="dealer_name" placeholder="Example Toyota North" />
+        </div>
+        <div class="field">
+          <label for="f-loc">Location</label>
+          <input id="f-loc" type="text" name="dealer_location" placeholder="Springfield, IL" />
+        </div>
+        <div class="field">
+          <label for="f-contact">Contact</label>
+          <input id="f-contact" type="text" name="contact_info" placeholder="(555) 010-0100" />
+        </div>
+        <div class="field field--full">
+          <label for="f-url">Listing URL</label>
+          <input id="f-url" type="url" name="listing_url" placeholder="https://carvana.com/vehicle/..." />
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="card grain form-card">
+      <legend class="form-legend">§ 03 · Field Notes</legend>
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="f-features">Features <span class="hint">(comma-separated)</span></label>
+          <input id="f-features" type="text" name="features" placeholder="Leather, Sunroof, Tow Package" />
+        </div>
+        <div class="field field--full">
+          <label for="f-notes">Notes</label>
+          <textarea id="f-notes" name="notes" rows="4" placeholder="Inspection observations, dealer impressions, follow-up reminders…"></textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="card form-card form-card--status">
+      <legend class="form-legend">§ 04 · Status</legend>
+      <div class="status-radios">
+        {[
+          { v: "watching", label: "Watching", tone: "sage" },
+          { v: "contacted", label: "Contacted", tone: "caution" },
+          { v: "scheduled", label: "Scheduled", tone: "rust" },
+          { v: "visited", label: "Visited", tone: "rust" },
+        ].map((s, i) => (
+          <label class="status-radio" data-tone={s.tone}>
+            <input type="radio" name="status" value={s.v} checked={i === 0} />
+            <span class="status-radio-dot" aria-hidden="true"></span>
+            <span class="status-radio-label">{s.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Save Listing →</button>
+      <a href="/listings" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</Layout>
+
+<style>
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    text-decoration: none;
+    margin-bottom: 16px;
+    transition: color 200ms ease;
+  }
+  .back-link:hover { color: var(--color-rust); }
+
+  .form-head {
+    margin-bottom: 28px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--color-line-faint);
+  }
+  .form-title {
+    font-size: 2.75rem;
+    color: var(--color-bone);
+    text-transform: uppercase;
+  }
+  .form-sub {
+    color: var(--color-bone-mute);
+    margin-top: 8px;
+    max-width: 60ch;
+  }
+
+  .form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 880px;
+  }
+
+  .form-card {
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    padding: 24px 28px 26px;
+    position: relative;
+    overflow: hidden;
+  }
+  .form-card legend {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    padding: 0 8px;
+    margin-left: -8px;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px 24px;
+    margin-top: 16px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field--full { grid-column: 1 / -1; }
+  .field label {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+  }
+  .field label .hint {
+    font-family: var(--font-mono);
+    text-transform: none;
+    letter-spacing: 0.04em;
+    color: var(--color-muted);
+    font-weight: 400;
+    font-size: 0.6875rem;
+    margin-left: 4px;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: var(--color-base);
+    border: 1px solid var(--color-line);
+    color: var(--color-bone);
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    border-radius: 2px;
+    transition: border-color 200ms ease;
+  }
+  .field input::placeholder,
+  .field textarea::placeholder { color: var(--color-faint); }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    outline: 2px solid var(--color-rust);
+    outline-offset: 2px;
+    border-color: var(--color-rust);
+  }
+  .field input[type="number"],
+  .field input[type="text"][name="vin"] {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+  .field textarea {
+    resize: vertical;
+    min-height: 96px;
+  }
+  .field select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 5 L6 8 L9 5' fill='none' stroke='%23c8a96f' stroke-width='1.5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+
+  .form-card--status .status-radios {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .status-radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--color-base);
+    border: 1px solid var(--color-line);
+    border-radius: 2px;
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-bone-mute);
+    transition: all 200ms ease;
+  }
+  .status-radio input { position: absolute; opacity: 0; pointer-events: none; }
+  .status-radio-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--color-line-strong);
+  }
+  .status-radio[data-tone="sage"] .status-radio-dot { background: var(--color-sage); }
+  .status-radio[data-tone="caution"] .status-radio-dot { background: var(--color-caution); }
+  .status-radio[data-tone="rust"] .status-radio-dot { background: var(--color-rust); }
+  .status-radio:has(input:checked) {
+    background: color-mix(in oklch, var(--color-rust) 14%, var(--color-card));
+    border-color: var(--color-rust);
+    color: var(--color-bone);
+  }
+  .status-radio:hover { border-color: var(--color-line-strong); color: var(--color-bone); }
+
+  .form-actions {
+    display: flex;
+    gap: 12px;
+    padding-top: 12px;
+  }
+  .form-actions .btn { padding: 14px 28px; font-size: 0.8125rem; }
+
+  @media (max-width: 640px) {
+    .form-card { padding: 22px 18px; }
+    .form-title { font-size: 2.25rem; }
+    .form-grid { gap: 14px 16px; }
+    .form-actions { flex-direction: column; }
+    .form-actions .btn { width: 100%; }
+  }
+</style>
+
+<script>
+  const form = document.getElementById("listing-form") as HTMLFormElement;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = form.querySelector<HTMLButtonElement>("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving…";
+    }
+
+    const formData = new FormData(form);
+    const data: Record<string, any> = {};
+
+    formData.forEach((value, key) => {
+      if (value === "" || value == null) return;
+      if (key === "features") {
+        data[key] = JSON.stringify(
+          (value as string).split(",").map((f) => f.trim()).filter(Boolean),
+        );
+      } else if (key === "price" || key === "mileage" || key === "year") {
+        const n = parseInt(value as string, 10);
+        if (!isNaN(n)) data[key] = n;
+      } else {
+        data[key] = value;
+      }
+    });
+
+    try {
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        window.location.href = "/listings";
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert("Error: " + (err.error || "Failed to save listing"));
+      }
+    } catch (err: any) {
+      alert("Error saving listing: " + (err?.message || "network error"));
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Save Listing →";
+      }
+    }
+  });
+</script>

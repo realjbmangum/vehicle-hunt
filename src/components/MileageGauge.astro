@@ -1,0 +1,129 @@
+---
+interface Props {
+  miles?: number | null;
+  max?: number;          // mileage cap that fills the ring
+  size?: number;
+  strokeWidth?: number;
+  label?: string;
+}
+
+const {
+  miles = null,
+  max = 100000,
+  size = 96,
+  strokeWidth = 6,
+  label = "miles",
+} = Astro.props;
+
+const radius = (size - strokeWidth) / 2;
+const cx = size / 2;
+const cy = size / 2;
+const circumference = 2 * Math.PI * radius;
+const ratio = miles == null ? 0 : Math.min(1, miles / max);
+const dash = circumference * ratio;
+const remainder = circumference - dash;
+
+// Stop ticks every 25k miles (or every quarter of max)
+const tickCount = 12;
+const ticks = Array.from({ length: tickCount }, (_, i) => i);
+
+const fmt =
+  miles == null
+    ? "—"
+    : miles >= 10000
+      ? (miles / 1000).toFixed(0) + "k"
+      : miles.toLocaleString();
+
+// Color tier — under 30k = go, 30-50 = caution, over 50 = stop
+const tier =
+  miles == null ? "muted" :
+  miles < 30000 ? "go" :
+  miles < 50000 ? "caution" :
+  "stop";
+
+const arcColor = {
+  go: "var(--color-go)",
+  caution: "var(--color-caution)",
+  stop: "var(--color-stop)",
+  muted: "var(--color-line-strong)",
+}[tier];
+---
+
+<div class="mileage-gauge" style={`width:${size}px;height:${size}px`}>
+  <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-label={`${fmt} ${label}`}>
+    <!-- tick ring -->
+    <g transform={`translate(${cx} ${cy})`}>
+      {ticks.map((i) => {
+        const angle = (i / tickCount) * 360 - 90;
+        const rad = (angle * Math.PI) / 180;
+        const inner = radius - 3;
+        const outer = radius + 4;
+        const x1 = Math.cos(rad) * inner;
+        const y1 = Math.sin(rad) * inner;
+        const x2 = Math.cos(rad) * outer;
+        const y2 = Math.sin(rad) * outer;
+        return (
+          <line
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke="var(--color-line-strong)"
+            stroke-width="0.75"
+            opacity="0.55"
+          />
+        );
+      })}
+    </g>
+    <!-- background track -->
+    <circle
+      cx={cx}
+      cy={cy}
+      r={radius}
+      fill="none"
+      stroke="var(--color-line)"
+      stroke-width={strokeWidth}
+      opacity="0.5"
+    />
+    <!-- value arc -->
+    <circle
+      cx={cx}
+      cy={cy}
+      r={radius}
+      fill="none"
+      stroke={arcColor}
+      stroke-width={strokeWidth}
+      stroke-linecap="butt"
+      stroke-dasharray={`${dash} ${remainder}`}
+      transform={`rotate(-90 ${cx} ${cy})`}
+    />
+    <!-- center text -->
+    <text
+      x={cx}
+      y={cy + 1}
+      text-anchor="middle"
+      dominant-baseline="central"
+      font-family="var(--font-mono)"
+      font-size={size * 0.26}
+      fill="var(--color-bone)"
+      font-weight="600"
+    >{fmt}</text>
+    <text
+      x={cx}
+      y={cy + size * 0.22}
+      text-anchor="middle"
+      font-family="var(--font-display)"
+      font-size={size * 0.085}
+      fill="var(--color-muted)"
+      letter-spacing="0.16em"
+    >{label.toUpperCase()}</text>
+  </svg>
+</div>
+
+<style>
+  .mileage-gauge {
+    display: inline-block;
+    position: relative;
+    flex-shrink: 0;
+  }
+</style>

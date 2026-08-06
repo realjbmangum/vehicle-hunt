@@ -1,0 +1,809 @@
+---
+import Layout from "../layouts/Layout.astro";
+import MileageGauge from "../components/MileageGauge.astro";
+import DistanceBadge from "../components/DistanceBadge.astro";
+import CompassCorner from "../components/CompassCorner.astro";
+import Pipeline from "../components/Pipeline.astro";
+import SonarRadar from "../components/SonarRadar.astro";
+import HuntLog from "../components/HuntLog.astro";
+import { calculateDealScore, type Listing } from "../lib/dealScore";
+
+function firstPhoto(photos: string | null | undefined): string | null {
+  if (!photos) return null;
+  try {
+    const arr = JSON.parse(photos);
+    if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === "string") {
+      return /^(https?:\/\/|\/img\/)/.test(arr[0]) ? arr[0] : null;
+    }
+  } catch {
+    if (typeof photos === "string" && /^(https?:\/\/|\/img\/)/.test(photos)) return photos;
+  }
+  return null;
+}
+
+let rawListings: Listing[] = [];
+let dbError = "";
+
+try {
+  const db = (Astro.locals as any).runtime?.env?.DB;
+  if (db) {
+    const result = await db
+      .prepare("SELECT * FROM listings ORDER BY updated_at DESC")
+      .all();
+    rawListings = (result.results || []) as Listing[];
+  }
+} catch (e: any) {
+  dbError = e?.message || String(e);
+}
+
+const scored = rawListings.map((l) => ({ ...l, score: calculateDealScore(l) }));
+
+// Pipeline counts
+const counts = {
+  watching: scored.filter((l) => l.status === "watching").length,
+  contacted: scored.filter((l) => l.status === "contacted").length,
+  scheduled: scored.filter((l) => l.status === "scheduled").length,
+  visited: scored.filter((l) => l.status === "visited").length,
+  bought: scored.filter((l) => l.status === "bought").length,
+  pass: scored.filter((l) => l.status === "pass").length,
+};
+
+const stages = [
+  { key: "watching", label: "Watching", count: counts.watching, tone: "sage" as const },
+  { key: "contacted", label: "Contacted", count: counts.contacted, tone: "caution" as const },
+  { key: "scheduled", label: "Scheduled", count: counts.scheduled, tone: "rust" as const },
+  { key: "visited", label: "Visited", count: counts.visited, tone: "rust" as const },
+  { key: "bought", label: "Bought", count: counts.bought, tone: "go" as const },
+];
+
+// Today's Hunt — top scoring active candidate
+const candidates = scored
+  .filter((l) => !["pass", "bought"].includes(l.status || ""))
+  .sort((a, b) => b.score.total - a.score.total);
+
+const hero = candidates[0] || null;
+const onPatrol = candidates.slice(1, 6);
+
+// Chart data for the scatter
+const chartData = scored.map((l) => ({
+  x: l.price,
+  y: l.mileage || 0,
+  grade: l.score.grade,
+  total: l.score.total,
+  label: `${l.year} ${l.trim || "Tacoma"}`,
+}));
+---
+
+<Layout title="Tacoma Field Tracker — Dashboard" eyebrow="Hunt Status · Daily Briefing">
+
+  {dbError && (
+    <div class="alert">
+      <strong>D1 OFFLINE</strong>
+      <span class="font-mono">{dbError}</span>
+    </div>
+  )}
+
+  <!-- TODAY'S HUNT — hero -->
+  {hero ? (
+    <section class="hunt rise">
+      <CompassCorner position="tr" size={32} />
+      <div class="hunt-grid">
+        <!-- LEFT: visual (photo or sonar fallback) -->
+        <div class="hunt-visual">
+          {firstPhoto((hero as any).photos) ? (
+            <div class="hunt-photo">
+              <img src={firstPhoto((hero as any).photos)!} alt={`${hero.year} Tacoma ${hero.trim || ""}`.trim()} loading="lazy" />
+              <div class="hunt-photo-overlay">
+                <span class="font-mono coord">VEHICLE PHOTO · SOURCE: {((hero as any).source || "manual").toUpperCase()}</span>
+              </div>
+            </div>
+          ) : (
+            <SonarRadar size={300} caption="SCANNING · NO PHOTO ON FILE" />
+          )}
+        </div>
+
+        <!-- CENTER: marquee -->
+        <div class="hunt-marquee">
+          <div class="hunt-meta">
+            <span class="eyebrow">Today's Hunt · Best Standing</span>
+            <span class="coord">SCORE {hero.score.total}/100</span>
+          </div>
+          <h1 class="hunt-title">
+            <span class="hunt-year">{hero.year}</span>
+            <span class="hunt-trim">{hero.trim || "Tacoma"}</span>
+          </h1>
+          <div class="hunt-tags">
+            <span class="trail-marker" data-tone={hero.drivetrain ? "rust" : "caution"}>{hero.drivetrain || "DRIVETRAIN ?"}</span>
+            {hero.cab_type && <span class="trail-marker" data-tone="sage">{hero.cab_type}</span>}
+            {hero.bed_size && <span class="trail-marker" data-tone="sage">{hero.bed_size} BED</span>}
+            {hero.color && <span class="trail-marker">{hero.color}</span>}
+          </div>
+          <div class="hunt-stat-row">
+            <div class="hunt-price">
+              <span class="hunt-price-num font-mono">{hero.price ? `$${hero.price.toLocaleString()}` : "CALL"}</span>
+              <span class="hunt-price-label">ASKING</span>
+            </div>
+            <MileageGauge miles={hero.mileage} max={100000} size={104} strokeWidth={6} label="MILES" />
+          </div>
+          <div class="hunt-locator">
+            <DistanceBadge city={hero.dealer_location} miles={hero.dealer_location ? 24 : null} fallback={hero.dealer_name || null} />
+            {hero.dealer_name && <span class="hunt-dealer">@ {hero.dealer_name}</span>}
+          </div>
+          <div class="hunt-actions">
+            {hero.listing_url && (
+              <a href={hero.listing_url} target="_blank" rel="noopener" class="btn btn-primary">
+                Open Listing
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 L11 3 M11 3 H6 M11 3 V8" stroke-linecap="square" /></svg>
+              </a>
+            )}
+            <a href={`/listings/${hero.id}`} class="btn btn-ghost">Field Notes</a>
+          </div>
+        </div>
+
+        <!-- RIGHT: score breakdown + hunt log -->
+        <aside class="hunt-side">
+          <div class="hunt-score-panel">
+            <div class="score-stamp">
+              <div class="stamp" data-grade={hero.score.grade}>
+                <span style="font-size:1.75rem;line-height:1">{hero.score.grade}</span>
+                <span style="font-size:0.625rem;letter-spacing:0.18em;font-family:var(--font-mono);color:currentColor;opacity:0.65;margin-top:2px">{hero.score.total}/100</span>
+              </div>
+            </div>
+            <div class="score-rows">
+              {[
+                { k: "Price", v: hero.score.price, max: 26 },
+                { k: "Mileage", v: hero.score.mileage, max: 22 },
+                { k: "Year", v: hero.score.year, max: 17 },
+                { k: "Drive", v: hero.score.drivetrain, max: 15 },
+                { k: "Trim", v: hero.score.trim, max: 10 },
+                { k: "Config", v: hero.score.config, max: 10 },
+              ].map((r) => (
+                <div class="score-row">
+                  <span class="score-k">{r.k}</span>
+                  <div class="score-bar"><span class="score-fill" style={`width:${(r.v / r.max) * 100}%`}></span></div>
+                  <span class="score-v font-mono">{r.v}<span style="opacity:0.4">/{r.max}</span></span>
+                </div>
+              ))}
+            </div>
+            {hero.score.flags.length > 0 && (
+              <div class="score-flags">
+                {hero.score.flags.map((f) => (
+                  <span class="trail-marker" data-tone="caution">{f}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          <HuntLog listing={hero} />
+        </aside>
+      </div>
+    </section>
+  ) : (
+    <section class="hunt hunt--empty">
+      <CompassCorner position="tr" />
+      <div class="empty-marquee">
+        <span class="eyebrow">Today's Hunt</span>
+        <h1 class="heading-xl" style="font-size:2rem;margin-top:8px">No active candidates yet.</h1>
+        <p style="color:var(--color-bone-mute);margin-top:8px;max-width:48ch">
+          Email alerts are wired up. As soon as a Grade A or B Tacoma lands in your inbox, it will show up here.
+        </p>
+        <div style="margin-top:20px;display:flex;gap:12px">
+          <a href="/listings/new" class="btn btn-primary">Add manually</a>
+          <a href="/research" class="btn btn-ghost">Field Manual</a>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- PIPELINE -->
+  <section class="card card-elev grain pipeline-section">
+    <div class="section-head" style="border:none;margin-bottom:0">
+      <h2>Pipeline · Trail Markers</h2>
+      <span class="meta">{counts.watching + counts.contacted + counts.scheduled + counts.visited + counts.bought} ACTIVE</span>
+    </div>
+    <Pipeline stages={stages} />
+  </section>
+
+  <!-- TWO-COL: ON PATROL & SCATTER -->
+  <div class="dual-col">
+    <section class="card grain on-patrol">
+      <div class="section-head">
+        <h2>On Patrol</h2>
+        <span class="meta">{onPatrol.length} CANDIDATES</span>
+      </div>
+      {onPatrol.length === 0 ? (
+        <p class="empty-line">No additional candidates pending review.</p>
+      ) : (
+        <ul class="patrol-list">
+          {onPatrol.map((l) => (
+            <li class="patrol-row">
+              <div class="stamp" data-grade={l.score.grade} style="width:48px;height:48px;font-size:1.25rem">{l.score.grade}</div>
+              <div class="patrol-main">
+                <div class="patrol-title">
+                  <span class="font-display heading-md" style="font-size:1rem">{l.year} <span style="color:var(--color-bone-mute);font-weight:500">{l.trim || "Tacoma"}</span></span>
+                </div>
+                <div class="patrol-meta">
+                  <span class="patrol-price font-mono">{l.price ? `$${l.price.toLocaleString()}` : "CALL"}</span>
+                  <span class="patrol-dot">·</span>
+                  <span class="font-mono" style="color:var(--color-bone-mute)">{l.mileage ? l.mileage.toLocaleString() + " mi" : "miles ?"}</span>
+                  <span class="patrol-dot">·</span>
+                  <DistanceBadge city={l.dealer_location} miles={l.dealer_location ? 32 : null} fallback={l.dealer_name || null} />
+                </div>
+              </div>
+              <a href={`/listings/${l.id}`} class="patrol-link" aria-label="View notes for this listing">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12 L11 8 L5 4" stroke-linecap="square" /></svg>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="card grain scatter-section">
+      <div class="section-head">
+        <h2>Terrain · Price × Miles</h2>
+        <span class="meta">N={chartData.length}</span>
+      </div>
+      <div id="scatter-chart"></div>
+      <div class="scatter-legend">
+        <span><span class="dot" style="background:var(--color-go)"></span>Grade A</span>
+        <span><span class="dot" style="background:var(--color-coyote)"></span>Grade B</span>
+        <span><span class="dot" style="background:var(--color-caution)"></span>Grade C</span>
+        <span><span class="dot" style="background:var(--color-rust)"></span>Grade D</span>
+        <span><span class="dot" style="background:var(--color-stop)"></span>Grade F</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- ALL CANDIDATES MATRIX -->
+  {scored.length > 0 && (
+    <section class="card grain matrix-section">
+      <div class="section-head">
+        <h2>All Candidates</h2>
+        <span class="meta" style="color:var(--color-muted)">{candidates.length} ACTIVE · {counts.pass} PASSED</span>
+        <a href="/listings" class="meta" style="color:var(--color-rust);text-decoration:none;font-weight:700">MANAGE ALL →</a>
+      </div>
+      <div class="matrix-table-wrap">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Grade</th>
+              <th>Vehicle</th>
+              <th class="num">Price</th>
+              <th class="num">Miles</th>
+              <th>Drive</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {candidates.map((l) => (
+              <tr>
+                <td>
+                  <div class="stamp" data-grade={l.score.grade} style="width:38px;height:38px;font-size:0.875rem">{l.score.grade}</div>
+                </td>
+                <td>
+                  <div class="font-display" style="font-stretch:80%;font-weight:600;font-size:0.95rem;color:var(--color-bone)">{l.year} {l.trim || "Tacoma"}</div>
+                  <div style="font-size:0.6875rem;color:var(--color-muted);font-family:var(--font-mono);margin-top:2px">{l.dealer_name || "—"}</div>
+                  {typeof l.accident_count === "number" && l.accident_count > 0 && (
+                    <div class="matrix-accident font-mono">
+                      &#9650; {l.accident_count} ACCIDENT{l.accident_count === 1 ? "" : "S"}
+                    </div>
+                  )}
+                </td>
+                <td class="num font-mono" style="color:var(--color-bone)">{l.price ? `$${l.price.toLocaleString()}` : "CALL"}</td>
+                <td class="num font-mono" style="color:var(--color-bone-mute)">{l.mileage ? l.mileage.toLocaleString() : "—"}</td>
+                <td><span class="font-mono" style={`font-size:0.6875rem;color:${l.drivetrain ? "var(--color-coyote)" : "var(--color-caution)"}`}>{(l.drivetrain || "UNK").toUpperCase()}</span></td>
+                <td>
+                  <span class="trail-marker" data-tone={
+                    l.status === "watching" ? "sage" :
+                    l.status === "contacted" ? "caution" :
+                    l.status === "scheduled" ? "rust" :
+                    l.status === "visited" ? "rust" :
+                    l.status === "bought" ? "go" : "stop"
+                  }>{l.status}</span>
+                </td>
+                <td><a href={`/listings/${l.id}`} class="link-arrow">VIEW</a></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )}
+</Layout>
+
+<style>
+  .alert {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 16px;
+    background: color-mix(in oklch, var(--color-stop) 18%, var(--color-card-elev));
+    color: oklch(0.88 0.13 35);
+    border: 1px solid var(--color-line-strong);
+    border-radius: 3px;
+    margin-bottom: 24px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+  }
+  .alert strong {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    letter-spacing: 0.16em;
+  }
+
+  /* === HUNT HERO === */
+  .hunt {
+    position: relative;
+    padding: 32px 32px 28px;
+    background: var(--color-card);
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+  .hunt::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--topo-svg);
+    background-size: 600px 600px;
+    opacity: 0.08;
+    pointer-events: none;
+  }
+  .hunt::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 3px;
+    background: var(--color-rust);
+  }
+  .hunt-grid {
+    display: grid;
+    grid-template-columns: 300px 1.4fr 0.9fr;
+    gap: 28px;
+    position: relative;
+    z-index: 1;
+    align-items: start;
+  }
+  .hunt-visual { position: relative; }
+  .hunt-photo {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--color-base);
+  }
+  .hunt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hunt-photo-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 8px 12px;
+    background: linear-gradient(to top, color-mix(in oklch, var(--color-base) 92%, transparent), transparent);
+    color: var(--color-coyote);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+  }
+  .hunt-marquee { display: flex; flex-direction: column; gap: 14px; }
+  .hunt-side { display: flex; flex-direction: column; gap: 16px; }
+  .hunt-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .hunt-meta .coord {
+    color: var(--color-rust);
+    font-weight: 700;
+  }
+  .hunt-title {
+    font-family: var(--font-display);
+    font-stretch: 70%;
+    font-weight: 800;
+    letter-spacing: -0.005em;
+    line-height: 0.92;
+    margin: 0;
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .hunt-year {
+    font-size: 5.5rem;
+    color: var(--color-bone);
+    letter-spacing: -0.015em;
+  }
+  .hunt-trim {
+    font-size: 2.5rem;
+    color: var(--color-rust);
+    font-stretch: 75%;
+    font-weight: 800;
+    letter-spacing: 0.005em;
+  }
+  .hunt-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .hunt-price {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+  }
+  .hunt-price-num {
+    font-family: var(--font-mono);
+    font-size: 3rem;
+    font-weight: 600;
+    color: var(--color-bone);
+    letter-spacing: -0.02em;
+  }
+  .hunt-price-label {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-size: 0.625rem;
+    letter-spacing: 0.22em;
+    color: var(--color-coyote);
+    margin-top: 6px;
+  }
+  .hunt-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .hunt-locator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-line);
+  }
+  .hunt-dealer {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-bone-mute);
+    letter-spacing: 0.04em;
+  }
+  .hunt-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .hunt-score-panel {
+    background: var(--color-base);
+    border: 1px solid var(--color-line-strong);
+    border-radius: 3px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+  }
+  .hunt-score-panel::before {
+    content: "SCORE BREAKDOWN";
+    position: absolute;
+    top: -8px;
+    left: 16px;
+    background: var(--color-card);
+    padding: 0 8px;
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    color: var(--color-coyote);
+  }
+  .score-stamp { display: flex; justify-content: center; }
+  .score-stamp .stamp { width: 88px; height: 88px; }
+  .score-rows { display: flex; flex-direction: column; gap: 8px; }
+  .score-row {
+    display: grid;
+    grid-template-columns: 56px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+  }
+  .score-k {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-bone-mute);
+  }
+  .score-bar {
+    height: 4px;
+    background: var(--color-line);
+    border-radius: 0;
+    overflow: hidden;
+  }
+  .score-fill {
+    display: block;
+    height: 100%;
+    background: var(--color-rust);
+    box-shadow: inset 0 1px 0 var(--color-rust-bright);
+  }
+  .score-v {
+    font-size: 0.75rem;
+    text-align: right;
+    color: var(--color-bone);
+  }
+  .score-flags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-line-faint);
+  }
+
+  .hunt--empty .empty-marquee {
+    padding: 20px 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* === PIPELINE === */
+  .pipeline-section {
+    padding: 24px 28px 32px;
+    margin-bottom: 28px;
+  }
+
+  /* === DUAL COL === */
+  .dual-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .on-patrol, .scatter-section {
+    padding: 24px 28px;
+  }
+  .empty-line {
+    color: var(--color-muted);
+    font-style: italic;
+    padding: 24px 0;
+  }
+  .patrol-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .patrol-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--color-line-faint);
+  }
+  .patrol-row:last-child { border-bottom: none; }
+  .patrol-main { flex: 1; min-width: 0; }
+  .patrol-title { line-height: 1.1; }
+  .patrol-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    font-size: 0.75rem;
+  }
+  .patrol-price {
+    color: var(--color-bone);
+    font-weight: 600;
+  }
+  .patrol-dot { color: var(--color-faint); }
+  .patrol-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: var(--color-coyote);
+    border: 1px solid var(--color-line);
+    border-radius: 2px;
+    transition: all 200ms ease;
+  }
+  .patrol-link:hover {
+    background: var(--color-card-elev);
+    color: var(--color-rust);
+    border-color: var(--color-rust);
+  }
+
+  .scatter-section { min-height: 320px; }
+  #scatter-chart { height: 240px; }
+  .scatter-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-line-faint);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    color: var(--color-bone-mute);
+    text-transform: uppercase;
+  }
+  .scatter-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+  .scatter-legend .dot {
+    width: 8px;
+    height: 8px;
+    display: inline-block;
+    border-radius: 50%;
+  }
+
+  /* === MATRIX TABLE === */
+  .matrix-section { padding: 24px 28px 16px; }
+  .matrix-accident {
+    margin-top: 3px;
+    font-size: 0.625rem;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: oklch(0.78 0.17 28);
+  }
+  .matrix-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .matrix-table-wrap { min-width: 0; }
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .matrix-table th {
+    text-align: left;
+    padding: 12px 12px 12px 0;
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    border-bottom: 1px solid var(--color-line);
+  }
+  .matrix-table th.num { text-align: right; }
+  .matrix-table td {
+    padding: 12px 12px 12px 0;
+    border-bottom: 1px dashed var(--color-line-faint);
+    vertical-align: middle;
+  }
+  .matrix-table td.num { text-align: right; }
+  .matrix-table tr:hover td { background: color-mix(in oklch, var(--color-card-elev) 30%, transparent); }
+  .link-arrow {
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--color-rust);
+    text-decoration: none;
+  }
+  .link-arrow::after { content: " →"; }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 1100px) {
+    .hunt-grid { grid-template-columns: 260px 1fr; }
+    .hunt-side { grid-column: 1 / -1; flex-direction: row; }
+    .hunt-side > * { flex: 1; }
+  }
+  @media (max-width: 900px) {
+    .hunt-grid { grid-template-columns: 1fr; gap: 20px; }
+    .hunt-visual { max-width: 360px; }
+    .hunt-side { flex-direction: column; }
+    .dual-col { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .hunt { padding: 22px 18px 20px; }
+    .hunt-year { font-size: 3.5rem; }
+    .hunt-trim { font-size: 1.625rem; }
+    .hunt-price-num { font-size: 2.25rem; }
+    .hunt-stat-row { gap: 20px; }
+    .hunt-actions { flex-direction: column; }
+    .hunt-actions .btn { width: 100%; }
+    .pipeline-section { padding: 20px 12px 16px; }
+    .on-patrol, .scatter-section, .matrix-section { padding: 20px 18px; }
+    .matrix-table { min-width: 540px; }
+    .matrix-table th, .matrix-table td { padding: 10px 8px 10px 0; font-size: 0.8125rem; }
+    /* Hide drive column on small screens — recoverable from card detail */
+    .matrix-table th:nth-child(5), .matrix-table td:nth-child(5) { display: none; }
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts" is:inline></script>
+<script define:vars={{ chartData }}>
+  if (chartData.length > 0) {
+    const gradeColor = {
+      A: getComputedStyle(document.documentElement).getPropertyValue("--color-go") || "#5da548",
+      B: getComputedStyle(document.documentElement).getPropertyValue("--color-coyote") || "#c8a96f",
+      C: getComputedStyle(document.documentElement).getPropertyValue("--color-caution") || "#c9962a",
+      D: getComputedStyle(document.documentElement).getPropertyValue("--color-rust") || "#b85c3a",
+      F: getComputedStyle(document.documentElement).getPropertyValue("--color-stop") || "#8c3a2a",
+    };
+    const series = ["A", "B", "C", "D", "F"].map((g) => ({
+      name: `Grade ${g}`,
+      data: chartData.filter((d) => d.grade === g).map((d) => ({ x: d.x, y: d.y, label: d.label, score: d.total })),
+    }));
+
+    const ready = () => {
+      const opts = {
+        series,
+        chart: {
+          type: "scatter",
+          height: 240,
+          background: "transparent",
+          toolbar: { show: false },
+          zoom: { enabled: false },
+          fontFamily: "Geist Mono, monospace",
+          animations: { enabled: false },
+        },
+        colors: [gradeColor.A, gradeColor.B, gradeColor.C, gradeColor.D, gradeColor.F],
+        markers: { size: 8, strokeWidth: 1, strokeColors: "rgba(0,0,0,0.3)" },
+        legend: { show: false },
+        xaxis: {
+          title: { text: "PRICE (USD)", style: { color: "#8a8175", fontSize: "10px", fontFamily: "Saira", fontWeight: 700 } },
+          labels: { style: { colors: "#c8a96f", fontSize: "10px" }, formatter: (v) => "$" + (v / 1000).toFixed(0) + "k" },
+          axisBorder: { color: "#3a3528" },
+          axisTicks: { color: "#3a3528" },
+          tickAmount: 5,
+          min: 18000, max: 42000,
+        },
+        yaxis: {
+          title: { text: "MILES", style: { color: "#8a8175", fontSize: "10px", fontFamily: "Saira", fontWeight: 700 } },
+          labels: { style: { colors: "#c8a96f", fontSize: "10px" }, formatter: (v) => (v / 1000).toFixed(0) + "k" },
+          min: 0, max: 100000,
+        },
+        grid: {
+          borderColor: "#332e22",
+          strokeDashArray: 2,
+          xaxis: { lines: { show: true } },
+          yaxis: { lines: { show: true } },
+        },
+        tooltip: {
+          theme: "dark",
+          custom: ({ seriesIndex, dataPointIndex, w }) => {
+            const d = w.config.series[seriesIndex].data[dataPointIndex];
+            return `<div style="padding:10px 12px;background:#1c1a17;border:1px solid #45402e;font-family:Geist Mono">
+              <div style="font-family:Saira;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#f3ebd9;font-size:11px">${d.label}</div>
+              <div style="color:#c8a96f;font-size:11px;margin-top:4px">$${d.x.toLocaleString()} · ${d.y.toLocaleString()} mi</div>
+              <div style="color:#f3ebd9;font-size:11px;margin-top:2px">Score ${d.score}/100</div>
+            </div>`;
+          },
+        },
+        annotations: {
+          xaxis: [{
+            x: 38000,
+            borderColor: "#b85c3a",
+            strokeDashArray: 4,
+            label: {
+              text: "BUDGET",
+              borderColor: "transparent",
+              style: { color: "#1c1a17", background: "#b85c3a", fontFamily: "Saira", fontWeight: 700, fontSize: "9px" },
+            },
+          }],
+          yaxis: [{
+            y: 50000,
+            borderColor: "#c9962a",
+            strokeDashArray: 4,
+            label: {
+              text: "MILEAGE CAP",
+              borderColor: "transparent",
+              style: { color: "#1c1a17", background: "#c9962a", fontFamily: "Saira", fontWeight: 700, fontSize: "9px" },
+            },
+          }],
+        },
+      };
+      const chart = new ApexCharts(document.querySelector("#scatter-chart"), opts);
+      chart.render();
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", ready);
+    } else {
+      ready();
+    }
+  }
+</script>

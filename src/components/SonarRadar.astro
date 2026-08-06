@@ -1,0 +1,130 @@
+---
+interface Props {
+  size?: number;
+  caption?: string | null;
+  bearing?: string | null;
+}
+const { size = 280, caption = "SCANNING", bearing = null } = Astro.props;
+---
+
+<div class="sonar" style={`width:${size}px;height:${size}px`} role="img" aria-label="Vehicle photo unavailable — radar scan placeholder">
+  <svg viewBox="0 0 200 200" width={size} height={size}>
+    <!-- Outer frame -->
+    <rect x="2" y="2" width="196" height="196" rx="2" fill="none" stroke="var(--color-line)" stroke-width="0.5" />
+
+    <!-- Concentric rings -->
+    <g fill="none" stroke="var(--color-sage)" stroke-opacity="0.45" stroke-width="0.5">
+      <circle cx="100" cy="100" r="92" />
+      <circle cx="100" cy="100" r="72" />
+      <circle cx="100" cy="100" r="52" />
+      <circle cx="100" cy="100" r="32" />
+      <circle cx="100" cy="100" r="14" />
+    </g>
+
+    <!-- Cardinal cross -->
+    <g stroke="var(--color-sage)" stroke-opacity="0.4" stroke-width="0.4" stroke-dasharray="2 2">
+      <line x1="100" y1="8" x2="100" y2="192" />
+      <line x1="8" y1="100" x2="192" y2="100" />
+      <line x1="34" y1="34" x2="166" y2="166" />
+      <line x1="166" y1="34" x2="34" y2="166" />
+    </g>
+
+    <!-- Cardinal labels -->
+    <g font-family="var(--font-mono)" font-size="6" fill="var(--color-coyote)" opacity="0.6" text-anchor="middle">
+      <text x="100" y="14">N</text>
+      <text x="100" y="195">S</text>
+      <text x="194" y="103">E</text>
+      <text x="6" y="103">W</text>
+    </g>
+
+    <!-- Tick marks at every 30° -->
+    <g stroke="var(--color-coyote)" stroke-opacity="0.55" stroke-width="0.5">
+      {[...Array(12)].map((_, i) => {
+        const angle = (i * 30 - 90) * (Math.PI / 180);
+        const x1 = 100 + Math.cos(angle) * 88;
+        const y1 = 100 + Math.sin(angle) * 88;
+        const x2 = 100 + Math.cos(angle) * 92;
+        const y2 = 100 + Math.sin(angle) * 92;
+        return <line x1={x1} y1={y1} x2={x2} y2={y2} />;
+      })}
+    </g>
+
+    <!-- Sweep arc -->
+    <g class="sweep">
+      <defs>
+        <linearGradient id="sweepGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="var(--color-go)" stop-opacity="0" />
+          <stop offset="80%" stop-color="var(--color-go)" stop-opacity="0.25" />
+          <stop offset="100%" stop-color="var(--color-go)" stop-opacity="0.55" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M 100 100 L 100 8 A 92 92 0 0 1 192 100 Z"
+        fill="url(#sweepGrad)"
+      />
+      <line x1="100" y1="100" x2="100" y2="8" stroke="var(--color-go)" stroke-width="1" />
+    </g>
+
+    <!-- Truck silhouette (side view, centered) -->
+    <g transform="translate(100 100)">
+      <g transform="translate(-32 -10)" fill="var(--color-coyote)" fill-opacity="0.85" stroke="var(--color-bone)" stroke-opacity="0.4" stroke-width="0.3">
+        <!-- Truck body silhouette: cab + bed + hood -->
+        <path d="M 4 14 L 4 8 L 12 8 L 18 0 L 36 0 L 39 4 L 56 4 L 60 8 L 62 14 Z" />
+        <!-- Wheels -->
+        <circle cx="14" cy="15" r="4" fill="var(--color-base)" stroke="var(--color-coyote)" stroke-width="0.6" />
+        <circle cx="14" cy="15" r="1.6" fill="var(--color-coyote)" />
+        <circle cx="50" cy="15" r="4" fill="var(--color-base)" stroke="var(--color-coyote)" stroke-width="0.6" />
+        <circle cx="50" cy="15" r="1.6" fill="var(--color-coyote)" />
+        <!-- Window (cab) -->
+        <path d="M 19 2 L 35 2 L 37 6 L 19 6 Z" fill="var(--color-base)" stroke="none" />
+      </g>
+    </g>
+
+    <!-- Center crosshair -->
+    <g stroke="var(--color-rust)" stroke-width="0.6">
+      <line x1="92" y1="100" x2="98" y2="100" />
+      <line x1="102" y1="100" x2="108" y2="100" />
+      <line x1="100" y1="92" x2="100" y2="98" />
+      <line x1="100" y1="102" x2="100" y2="108" />
+    </g>
+    <circle cx="100" cy="100" r="1.4" fill="var(--color-rust)" />
+
+    <!-- Caption -->
+    {caption && (
+      <text x="100" y="180" text-anchor="middle" font-family="var(--font-mono)" font-size="6" fill="var(--color-coyote)" letter-spacing="2">
+        {caption}
+      </text>
+    )}
+
+    <!-- Coordinate corner stamp -->
+    <g transform="translate(8 188)" font-family="var(--font-mono)" font-size="5" fill="var(--color-coyote)" opacity="0.6">
+      <text>35.18°N · 80.73°W</text>
+    </g>
+    {bearing && (
+      <g transform="translate(192 188)" font-family="var(--font-mono)" font-size="5" fill="var(--color-coyote)" opacity="0.6" text-anchor="end">
+        <text>BRG {bearing}</text>
+      </g>
+    )}
+  </svg>
+</div>
+
+<style>
+  .sonar {
+    position: relative;
+    background: radial-gradient(ellipse at center, color-mix(in oklch, var(--color-sage) 12%, var(--color-base)) 0%, var(--color-base) 80%);
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .sweep {
+    transform-origin: 100px 100px;
+    animation: sonar-sweep 4s linear infinite;
+  }
+  @keyframes sonar-sweep {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sweep { animation: none; opacity: 0.3; }
+  }
+</style>

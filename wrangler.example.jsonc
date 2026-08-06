@@ -1,0 +1,17 @@
+// Copy to wrangler.jsonc and fill in your own values. This is the Astro
+// dashboard (Cloudflare Pages); the ingest worker has its own config under
+// email-worker/. Both bind the same D1 database.
+{
+  "name": "vehicle-hunt",
+  "pages_build_output_dir": "dist",
+  "compatibility_date": "2026-02-04",
+  "compatibility_flags": ["nodejs_compat_v2"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vehicle-hunt-db",
+      "database_id": "PASTE_YOUR_DATABASE_ID_HERE"
+    }
+  ],
+  "observability": { "enabled": true }
+}

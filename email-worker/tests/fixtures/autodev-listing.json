@@ -1,0 +1,57 @@
+{
+  "@id": "https://api.auto.dev/listings/3TYJDAKNXRT007351",
+  "vin": "3TYJDAKNXRT007351",
+  "createdAt": "2026-07-12 23:12:43",
+  "location": [
+    -80.681738,
+    35.100329
+  ],
+  "vehicle": {
+    "baseInvoice": 32532,
+    "baseMsrp": 34700,
+    "bodyStyle": "Truck",
+    "confidence": 0.995,
+    "cylinders": 4,
+    "doors": 2,
+    "drivetrain": "4WD",
+    "engine": "2.4L 4Cyl regular unleaded",
+    "exteriorColor": "Unspecified",
+    "fuel": "Gasoline",
+    "interiorColor": "Black",
+    "make": "Toyota",
+    "model": "Tacoma",
+    "seats": 4,
+    "series": "SR 2dr Xtracab 4WD 6.1 ft. SB (2.4L 4cyl Turbo 8A)",
+    "squishVin": "3TYJDAKNRT",
+    "style": "Extended Cab Pickup",
+    "transmission": "Automatic",
+    "trim": "SR",
+    "type": "Truck",
+    "vin": "3TYJDAKNXRT007351",
+    "year": 2024
+  },
+  "wholesaleListing": null,
+  "retailListing": {
+    "carfaxUrl": "https://www.carfax.com/VehicleHistory/p/Report.cfx?vin=3TYJDAKNXRT007351&partner=FRD_2",
+    "city": "Matthews",
+    "cpo": false,
+    "dealer": "Scott Clark Toyota",
+    "miles": 10312,
+    "photoCount": 1,
+    "price": 32074,
+    "primaryImage": "https://retail.photos.vin/3TYJDAKNXRT007351-1.jpg",
+    "state": "NC",
+    "used": true,
+    "vdp": "#1017114909396276656",
+    "zip": "28105",
+    "dealerId": "d_3e0efb2a4a3ed97f"
+  },
+  "history": {
+    "accidentCount": 0,
+    "accidents": false,
+    "oneOwner": true,
+    "ownerCount": 1,
+    "personalUse": true,
+    "usageType": "Personal Use"
+  }
+}

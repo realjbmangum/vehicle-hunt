@@ -1,0 +1,847 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import MileageGauge from "../../components/MileageGauge.astro";
+import DistanceBadge from "../../components/DistanceBadge.astro";
+import CompassCorner from "../../components/CompassCorner.astro";
+import SonarRadar from "../../components/SonarRadar.astro";
+import HuntLog from "../../components/HuntLog.astro";
+import { calculateDealScore, type Listing } from "../../lib/dealScore";
+import { listingLink } from "../../lib/links";
+
+const { id } = Astro.params;
+let listing: Listing | null = null;
+
+try {
+  const db = (Astro.locals as any).runtime?.env?.DB;
+  if (db) {
+    listing = (await db
+      .prepare("SELECT * FROM listings WHERE id = ?")
+      .bind(id)
+      .first()) as Listing | null;
+  }
+} catch {
+  // D1 not available
+}
+
+if (!listing) {
+  return Astro.redirect("/listings");
+}
+
+const score = calculateDealScore(listing);
+
+/**
+ * Vehicle history, reported against the VIN by the inventory feed.
+ *
+ * The whole point of this block is that "0 accidents reported" and "nobody
+ * ever told us" are different answers, and rendering them the same way is how
+ * a tracker starts lying to its owner — the same mistake the old code made
+ * when it defaulted unknown drivetrains to 4WD. An unknown here reads as a
+ * caution, never as good news.
+ */
+const hasHistory =
+  listing.accident_count != null ||
+  listing.owner_count != null ||
+  !!listing.carfax_url ||
+  listing.msrp != null;
+
+const accidents = listing.accident_count ?? null;
+const owners = listing.owner_count ?? null;
+
+const h = {
+  accidentTone: accidents === null ? "caution" : accidents === 0 ? "go" : "stop",
+  accidentLabel:
+    accidents === null
+      ? "ACCIDENTS NOT REPORTED"
+      : accidents === 0
+        ? "NO ACCIDENTS REPORTED"
+        : `${accidents} ACCIDENT${accidents === 1 ? "" : "S"} REPORTED`,
+
+  ownerTone: owners === null ? "caution" : owners === 1 ? "go" : "sage",
+  ownerLabel:
+    owners === null
+      ? "OWNERS NOT REPORTED"
+      : `${owners} OWNER${owners === 1 ? "" : "S"}`,
+
+  // A fleet or rental truck is a real yellow flag, and it's the one thing
+  // here worth surfacing louder than its absence.
+  usageTone: listing.personal_use === 0 ? "caution" : "sage",
+  usageLabel:
+    listing.personal_use === 1
+      ? "PERSONAL USE"
+      : listing.personal_use === 0
+        ? "FLEET / RENTAL USE"
+        : null,
+};
+
+const statusOrder = ["watching", "contacted", "scheduled", "visited", "pass", "bought"] as const;
+const toneByStatus: Record<string, "sage" | "caution" | "rust" | "go" | "stop"> = {
+  watching: "sage",
+  contacted: "caution",
+  scheduled: "rust",
+  visited: "rust",
+  pass: "stop",
+  bought: "go",
+};
+const status = listing.status || "watching";
+
+let features: string[] = [];
+if (listing.features) {
+  try {
+    features = JSON.parse(listing.features as string);
+  } catch {
+    features = (listing.features as string)
+      .split(",")
+      .map((f) => f.trim())
+      .filter(Boolean);
+  }
+}
+
+function firstPhoto(photos: any): string | null {
+  if (!photos) return null;
+  try {
+    const arr = JSON.parse(photos);
+    if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === "string") {
+      return /^(https?:\/\/|\/img\/)/.test(arr[0]) ? arr[0] : null;
+    }
+  } catch {
+    if (typeof photos === "string" && /^(https?:\/\/|\/img\/)/.test(photos)) return photos;
+  }
+  return null;
+}
+const photo = firstPhoto((listing as any).photos);
+const link = listingLink(listing as any);
+const source = (listing as any).source ? String((listing as any).source).split(",")[0] : null;
+---
+
+<Layout
+  title={`${listing.year} Tacoma ${listing.trim || ""} — Field Notes`}
+  eyebrow={`Listing #${listing.id} · Field Notes`}
+>
+  <a href="/listings" class="back-link">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 9 L4 6 L7 3" stroke-linecap="square" /></svg>
+    All Listings
+  </a>
+
+  <!-- HERO -->
+  <section class="detail-hero rise">
+    <CompassCorner position="tr" size={32} />
+    <div class="dh-grid">
+      <div class="dh-visual">
+        {photo ? (
+          <div class="dh-photo">
+            <img src={photo} alt={`${listing.year} Tacoma ${listing.trim || ""}`.trim()} loading="lazy" />
+            {source && <span class="dh-photo-tag font-mono">SRC · {source.toUpperCase()}</span>}
+          </div>
+        ) : (
+          <SonarRadar size={300} caption="SCANNING · NO PHOTO ON FILE" />
+        )}
+      </div>
+
+      <div class="dh-marquee">
+        <div class="dh-meta">
+          <span class="eyebrow">Field Notes</span>
+          <span class="trail-marker" data-tone={toneByStatus[status]}>{status}</span>
+        </div>
+        <h1 class="dh-title">
+          <span class="dh-year">{listing.year}</span>
+          <span class="dh-trim">{listing.trim || "Tacoma"}</span>
+        </h1>
+        <div class="dh-tags">
+          <span class="trail-marker" data-tone={listing.drivetrain ? "rust" : "caution"}>{listing.drivetrain || "DRIVETRAIN ?"}</span>
+          {listing.cab_type && <span class="trail-marker" data-tone="sage">{listing.cab_type}</span>}
+          {listing.bed_size && <span class="trail-marker" data-tone="sage">{listing.bed_size} BED</span>}
+          {listing.color && <span class="trail-marker">{listing.color}</span>}
+        </div>
+        {accidents !== null && accidents > 0 && (
+          <div class="dh-accident">
+            <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+              <path d="M7 1.5 L13 12 L1 12 Z" stroke-linejoin="round" />
+              <path d="M7 5.5 V8.5" stroke-linecap="round" />
+              <circle cx="7" cy="10.2" r="0.7" fill="currentColor" stroke="none" />
+            </svg>
+            <span>{accidents} ACCIDENT{accidents === 1 ? "" : "S"} REPORTED ON THIS VIN</span>
+            <span class="dh-accident-pts font-mono">&minus;{score.accidentPenalty} PTS</span>
+          </div>
+        )}
+        <div class="dh-stat-row">
+          <div class="dh-stat">
+            <span class="dh-stat-value font-mono">{listing.price ? `$${listing.price.toLocaleString()}` : "CALL"}</span>
+            <span class="dh-stat-label">ASKING</span>
+          </div>
+          <MileageGauge miles={listing.mileage} max={100000} size={96} strokeWidth={5} label="MILES" />
+          <div class="dh-stat">
+            <span class="dh-stat-value font-mono">{score.total}</span>
+            <span class="dh-stat-label">SCORE / 100</span>
+          </div>
+        </div>
+        <div class="dh-locator">
+          <DistanceBadge city={listing.dealer_location} miles={listing.dealer_location ? 24 : null} fallback={listing.dealer_name || null} />
+          {listing.dealer_name && <span class="dh-dealer">@ {listing.dealer_name}</span>}
+        </div>
+        <div class="dh-actions">
+          <a href={link.href} target="_blank" rel="noopener" class={link.isExact ? "btn btn-primary" : "btn btn-ghost"}>
+            {link.label}
+            {link.isExact ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11 L11 3 M11 3 H6 M11 3 V8" stroke-linecap="square" /></svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="4" /><path d="M9 9 L12.5 12.5" stroke-linecap="square" /></svg>
+            )}
+          </a>
+          {!link.isExact && (
+            <span class="dh-nolink font-mono">no ad URL on file — this is a search, not the listing</span>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TWO-COL: MAIN + SIDEBAR -->
+  <div class="detail-cols">
+    <div class="detail-main">
+
+      <!-- Score breakdown -->
+      <section class="card grain detail-section">
+        <div class="section-head">
+          <h2>§ Score Breakdown</h2>
+          <span class="meta">GRADE {score.grade} · {score.total}/100</span>
+        </div>
+        <div class="score-grid">
+          <div class="stamp" data-grade={score.grade} style="width:88px;height:88px">
+            <span style="font-size:2rem;line-height:1">{score.grade}</span>
+            <span style="font-size:0.625rem;letter-spacing:0.18em;font-family:var(--font-mono);color:currentColor;opacity:0.7;margin-top:2px">{score.total}/100</span>
+          </div>
+          <div class="score-rows">
+            {[
+              { k: "Price", v: score.price, max: 26 },
+              { k: "Mileage", v: score.mileage, max: 22 },
+              { k: "Year", v: score.year, max: 17 },
+              { k: "Drive", v: score.drivetrain, max: 15 },
+              { k: "Trim", v: score.trim, max: 10 },
+              { k: "Config", v: score.config, max: 10 },
+            ].map((r) => (
+              <div class="score-row">
+                <span class="score-k">{r.k}</span>
+                <div class="score-bar"><span class="score-fill" style={`width:${(r.v / r.max) * 100}%`}></span></div>
+                <span class="score-v font-mono">{r.v}<span style="opacity:0.4">/{r.max}</span></span>
+              </div>
+            ))}
+            {score.accidentPenalty > 0 && (
+              <div class="score-row score-row-penalty">
+                <span class="score-k">Accidents</span>
+                <div class="score-bar"><span class="score-fill score-fill-penalty" style={`width:${(score.accidentPenalty / 35) * 100}%`}></span></div>
+                <span class="score-v font-mono">&minus;{score.accidentPenalty}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        {score.flags.length > 0 ? (
+          <div class="score-flags">
+            <span class="eyebrow" style="color:oklch(0.78 0.13 50);font-size:0.625rem">Why this grade:</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+              {score.flags.map((f) => (
+                <span class="trail-marker" data-tone="caution">{f}</span>
+              ))}
+            </div>
+          </div>
+        ) : score.grade === "A" ? (
+          <div class="score-flags">
+            <span class="eyebrow" style="color:oklch(0.85 0.12 145)">✓ Meets every requirement</span>
+          </div>
+        ) : null}
+      </section>
+
+      <!-- Vehicle Details -->
+      <section class="card grain detail-section">
+        <div class="section-head">
+          <h2>§ Vehicle Spec</h2>
+          <span class="meta">FROM LISTING</span>
+        </div>
+        <dl class="spec-grid">
+          <div class="spec"><dt>Year</dt><dd class="font-mono">{listing.year}</dd></div>
+          <div class="spec"><dt>Trim</dt><dd>{listing.trim || "—"}</dd></div>
+          <div class="spec"><dt>Color</dt><dd>{listing.color || "—"}</dd></div>
+          <div class="spec"><dt>VIN</dt><dd class="font-mono" style="font-size:0.75rem">{listing.vin || "—"}</dd></div>
+          <div class="spec"><dt>Drivetrain</dt><dd>{listing.drivetrain || "—"}</dd></div>
+          <div class="spec"><dt>Cab</dt><dd>{listing.cab_type || "—"}</dd></div>
+          <div class="spec"><dt>Bed</dt><dd>{listing.bed_size || "—"}</dd></div>
+          <div class="spec"><dt>Source</dt><dd>{source ? source.toUpperCase() : "MANUAL"}</dd></div>
+        </dl>
+      </section>
+
+      {hasHistory && (
+        <section class="card grain detail-section">
+          <div class="section-head">
+            <h2>§ Vehicle History</h2>
+            <span class="meta">REPORTED AGAINST VIN</span>
+          </div>
+
+          <div class="history-flags">
+            <span class="trail-marker" data-tone={h.accidentTone}>{h.accidentLabel}</span>
+            <span class="trail-marker" data-tone={h.ownerTone}>{h.ownerLabel}</span>
+            {h.usageLabel && (
+              <span class="trail-marker" data-tone={h.usageTone}>{h.usageLabel}</span>
+            )}
+            {listing.cpo === 1 && (
+              <span class="trail-marker" data-tone="go">CERTIFIED PRE-OWNED</span>
+            )}
+          </div>
+
+          {listing.msrp ? (
+            <dl class="spec-grid" style="margin-top:18px">
+              <div class="spec"><dt>MSRP new</dt><dd class="font-mono">${listing.msrp.toLocaleString()}</dd></div>
+              {listing.price ? (
+                <div class="spec">
+                  <dt>Off MSRP</dt>
+                  <dd class="font-mono">{Math.round((1 - listing.price / listing.msrp) * 100)}%</dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
+
+          {listing.carfax_url && (
+            <a
+              class="btn btn-secondary carfax-link"
+              href={listing.carfax_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >Open the full Carfax for this VIN ↗</a>
+          )}
+
+          <p class="history-caveat">
+            Reported history only. A clean record is not a guarantee — damage
+            never filed to an insurer never appears here. Pull the full report
+            and inspect before you drive.
+          </p>
+        </section>
+      )}
+
+      {features.length > 0 && (
+        <section class="card grain detail-section">
+          <div class="section-head">
+            <h2>§ Features</h2>
+            <span class="meta">{String(features.length).padStart(2, "0")} TAGGED</span>
+          </div>
+          <div class="features-wrap">
+            {features.map((f) => (
+              <span class="trail-marker">{f}</span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <!-- Notes -->
+      <section class="card grain detail-section notes-section">
+        <div class="section-head">
+          <h2>§ Field Notes</h2>
+          <span class="meta">PRIVATE</span>
+        </div>
+        <textarea
+          id="notes-input"
+          class="notes-textarea"
+          rows="6"
+          placeholder="Inspection notes, dealer impressions, follow-up reminders…"
+          aria-label="Notes about this listing"
+        >{listing.notes || ""}</textarea>
+        <div class="notes-actions">
+          <button id="save-notes" class="btn btn-primary">Save Notes</button>
+          <span id="notes-status" class="notes-status"></span>
+        </div>
+      </section>
+
+      <!-- Inspection prompt -->
+      <section class="card grain detail-section inspect-section">
+        <div class="section-head">
+          <h2>§ Pre-Drive Inspection</h2>
+          <span class="meta">REFER TO FIELD MANUAL</span>
+        </div>
+        <p class="inspect-intro">Before you go see this truck, review the walk-away signals and pre-drive checklist.</p>
+        <div class="inspect-actions">
+          <a href="/research" class="btn btn-ghost">Open Field Manual →</a>
+        </div>
+      </section>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="detail-side">
+      <!-- Status updater -->
+      <section class="card detail-section side-section">
+        <div class="section-head">
+          <h2>§ Status</h2>
+          <span class="meta">PIPELINE STAGE</span>
+        </div>
+        <div class="status-buttons">
+          {statusOrder.map((s) => (
+            <button
+              class:list={["status-btn", status === s && "is-active"]}
+              data-status={s}
+              data-tone={toneByStatus[s]}
+            >
+              <span class="sb-dot" aria-hidden="true"></span>
+              <span class="sb-label">{s}</span>
+              {status === s && <span class="sb-current font-mono">CURRENT</span>}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <!-- Hunt Log -->
+      <HuntLog listing={listing} />
+
+      <!-- Contact -->
+      <section class="card detail-section side-section">
+        <div class="section-head">
+          <h2>§ Contact</h2>
+          <span class="meta">DEALER</span>
+        </div>
+        <dl class="contact-grid">
+          <div><dt>Dealer</dt><dd>{listing.dealer_name || "—"}</dd></div>
+          <div><dt>Location</dt><dd>{listing.dealer_location || "—"}</dd></div>
+          <div><dt>Contact</dt><dd>{(listing as any).contact_info || "—"}</dd></div>
+        </dl>
+      </section>
+
+      <!-- Danger zone -->
+      <section class="card detail-section side-section danger-section">
+        <div class="section-head" style="border-color:color-mix(in oklch, var(--color-stop) 30%, var(--color-line))">
+          <h2 style="color:oklch(0.85 0.12 35)">§ Danger Zone</h2>
+        </div>
+        <button id="delete-listing" class="danger-btn">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4 H11 M5 4 V2 H9 V4 M4 4 L4 12 H10 L10 4" stroke-linecap="square" /></svg>
+          Delete Listing
+        </button>
+      </section>
+    </aside>
+  </div>
+</Layout>
+
+<style>
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    text-decoration: none;
+    margin-bottom: 16px;
+    transition: color 200ms ease;
+  }
+  .back-link:hover { color: var(--color-rust); }
+
+  /* HERO */
+  .detail-hero {
+    position: relative;
+    background: var(--color-card);
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .detail-hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: var(--topo-svg);
+    background-size: 600px 600px;
+    opacity: 0.06;
+    pointer-events: none;
+  }
+  .detail-hero::after {
+    content: "";
+    position: absolute; left: 0; right: 0; top: 0;
+    height: 3px;
+    background: var(--color-rust);
+  }
+  .dh-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 28px;
+    align-items: start;
+    position: relative; z-index: 1;
+  }
+  .dh-nolink {
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    color: var(--color-coyote);
+    opacity: 0.7;
+    align-self: center;
+  }
+  .dh-photo {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--color-base);
+  }
+  .dh-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .dh-photo-tag {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: color-mix(in oklch, var(--color-base) 80%, transparent);
+    color: var(--color-coyote);
+    padding: 4px 8px;
+    font-size: 0.5625rem;
+    letter-spacing: 0.18em;
+    border: 1px solid var(--color-line);
+  }
+  .dh-marquee { display: flex; flex-direction: column; gap: 14px; }
+  .dh-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .dh-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-stretch: 70%;
+    font-weight: 800;
+    letter-spacing: -0.005em;
+    line-height: 0.92;
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .dh-year { font-size: 4.5rem; color: var(--color-bone); letter-spacing: -0.015em; }
+  .dh-trim { font-size: 2rem; color: var(--color-rust); font-stretch: 75%; font-weight: 800; letter-spacing: 0.005em; }
+  .dh-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dh-stat-row {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    flex-wrap: wrap;
+    padding: 4px 0;
+  }
+  .dh-stat { display: flex; flex-direction: column; line-height: 1; }
+  .dh-stat-value {
+    font-family: var(--font-mono);
+    font-size: 2.25rem;
+    font-weight: 600;
+    color: var(--color-bone);
+    letter-spacing: -0.02em;
+  }
+  .dh-stat-label {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-size: 0.625rem;
+    letter-spacing: 0.22em;
+    color: var(--color-coyote);
+    margin-top: 6px;
+  }
+  .dh-locator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-line);
+  }
+  .dh-dealer {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-bone-mute);
+  }
+  .dh-actions { display: flex; gap: 10px; padding-top: 4px; }
+
+  /* TWO-COL */
+  .detail-cols {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+  }
+  .detail-main { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .detail-side { display: flex; flex-direction: column; gap: 16px; }
+
+  .detail-section { padding: 24px 28px; position: relative; overflow: hidden; }
+  .side-section { padding: 18px 20px; }
+
+  /* Score breakdown */
+  .score-grid {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 8px 0;
+  }
+  .score-grid .score-rows { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .score-row {
+    display: grid;
+    grid-template-columns: 64px 1fr 64px;
+    align-items: center;
+    gap: 10px;
+  }
+  .score-k {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-bone-mute);
+  }
+  .score-bar { height: 5px; background: var(--color-line); overflow: hidden; }
+  .score-fill { display: block; height: 100%; background: var(--color-rust); box-shadow: inset 0 1px 0 var(--color-rust-bright); }
+  .score-v { font-size: 0.8125rem; text-align: right; color: var(--color-bone); }
+  .score-flags { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--color-line-faint); }
+
+  /* Spec */
+  .spec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px 24px;
+    margin: 0;
+  }
+  .spec dt {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    margin-bottom: 4px;
+  }
+  .spec dd { margin: 0; color: var(--color-bone); font-size: 0.9375rem; }
+
+  /* Features */
+  .features-wrap { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Notes */
+  /* Accident alert — top of the page, not buried in the history section */
+  .dh-accident {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 14px;
+    padding: 10px 13px;
+    border: 1px solid color-mix(in oklch, var(--color-stop) 60%, transparent);
+    border-left: 4px solid var(--color-stop);
+    background: color-mix(in oklch, var(--color-stop) 15%, var(--color-card-elev));
+    color: oklch(0.82 0.16 28);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.09em;
+    font-weight: 600;
+  }
+  .dh-accident svg { flex-shrink: 0; }
+  .dh-accident-pts { margin-left: auto; opacity: 0.85; }
+
+  .score-row-penalty .score-k,
+  .score-row-penalty .score-v { color: oklch(0.82 0.16 28); }
+  .score-fill-penalty { background: var(--color-stop) !important; }
+
+  /* Vehicle history */
+  .history-flags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .carfax-link { display: inline-block; margin-top: 18px; }
+  .history-caveat {
+    margin-top: 16px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--color-text-dim);
+    border-left: 2px solid color-mix(in oklch, var(--color-caution) 55%, transparent);
+    padding-left: 12px;
+  }
+
+  .notes-textarea {
+    width: 100%;
+    background: var(--color-base);
+    border: 1px solid var(--color-line);
+    color: var(--color-bone);
+    padding: 14px 16px;
+    font-family: var(--font-body);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    border-radius: 2px;
+    resize: vertical;
+    background-image:
+      linear-gradient(to bottom, transparent 27px, var(--color-line-faint) 27px, var(--color-line-faint) 28px, transparent 28px);
+    background-size: 100% 28px;
+  }
+  .notes-textarea:focus { outline: 2px solid var(--color-rust); outline-offset: 2px; border-color: var(--color-rust); }
+  .notes-actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+  .notes-status {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    color: var(--color-coyote);
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+  .notes-status.is-saved { opacity: 1; color: oklch(0.85 0.12 145); }
+  .notes-status.is-error { opacity: 1; color: oklch(0.85 0.13 35); }
+
+  /* Inspection */
+  .inspect-intro { color: var(--color-bone-mute); font-size: 0.875rem; line-height: 1.5; max-width: 60ch; }
+  .inspect-actions { margin-top: 16px; }
+
+  /* Status buttons */
+  .status-buttons { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+  .status-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid var(--color-line);
+    border-radius: 2px;
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-bone-mute);
+    cursor: pointer;
+    transition: all 200ms ease;
+    text-align: left;
+  }
+  .status-btn .sb-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--color-line-strong);
+    flex-shrink: 0;
+  }
+  .status-btn[data-tone="go"] .sb-dot { background: var(--color-go); }
+  .status-btn[data-tone="caution"] .sb-dot { background: var(--color-caution); }
+  .status-btn[data-tone="rust"] .sb-dot { background: var(--color-rust); }
+  .status-btn[data-tone="sage"] .sb-dot { background: var(--color-sage); }
+  .status-btn[data-tone="stop"] .sb-dot { background: var(--color-stop); }
+  .status-btn .sb-label { flex: 1; }
+  .status-btn .sb-current {
+    font-size: 0.5625rem;
+    color: var(--color-rust);
+    letter-spacing: 0.16em;
+  }
+  .status-btn:hover { border-color: var(--color-line-strong); color: var(--color-bone); background: color-mix(in oklch, var(--color-card-elev) 50%, transparent); }
+  .status-btn.is-active {
+    background: color-mix(in oklch, var(--color-rust) 14%, var(--color-card));
+    border-color: color-mix(in oklch, var(--color-rust) 50%, var(--color-line-strong));
+    color: var(--color-bone);
+  }
+
+  /* Contact */
+  .contact-grid { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 4px 0; }
+  .contact-grid dt {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.5625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    margin-bottom: 2px;
+  }
+  .contact-grid dd { margin: 0; color: var(--color-bone-mute); font-size: 0.875rem; }
+
+  /* Danger */
+  .danger-section { border-color: color-mix(in oklch, var(--color-stop) 25%, var(--color-line)); }
+  .danger-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: color-mix(in oklch, var(--color-stop) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--color-stop) 35%, var(--color-line));
+    color: oklch(0.85 0.12 30);
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 200ms ease;
+  }
+  .danger-btn:hover { background: color-mix(in oklch, var(--color-stop) 28%, transparent); border-color: var(--color-stop); }
+
+  @media (max-width: 1024px) {
+    .detail-cols { grid-template-columns: 1fr; }
+    .detail-side { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  }
+  @media (max-width: 760px) {
+    .dh-grid { grid-template-columns: 1fr; gap: 20px; }
+    .dh-visual { max-width: 320px; }
+    .dh-year { font-size: 3rem; }
+    .dh-trim { font-size: 1.5rem; }
+    .dh-stat-value { font-size: 1.75rem; }
+    .detail-hero { padding: 22px 18px; }
+    .detail-section { padding: 20px 18px; }
+    .score-grid { flex-direction: column; align-items: stretch; }
+  }
+</style>
+
+<script define:vars={{ listingId: id }}>
+  const setStatus = (msg, kind) => {
+    const el = document.getElementById("notes-status");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove("is-saved", "is-error");
+    if (kind) el.classList.add(kind);
+  };
+
+  document.querySelectorAll(".status-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const status = btn.getAttribute("data-status");
+      document.querySelectorAll(".status-btn").forEach((b) => b.setAttribute("disabled", "true"));
+      try {
+        const res = await fetch(`/api/listings/${listingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          const data = await res.json().catch(() => ({}));
+          alert("Failed to update status: " + (data.error || "Unknown error"));
+        }
+      } catch (err) {
+        alert("Error updating status: " + err.message);
+      } finally {
+        document.querySelectorAll(".status-btn").forEach((b) => b.removeAttribute("disabled"));
+      }
+    });
+  });
+
+  document.getElementById("save-notes")?.addEventListener("click", async () => {
+    const input = document.getElementById("notes-input");
+    const notes = input ? input.value : "";
+    setStatus("Saving…", null);
+    try {
+      const res = await fetch(`/api/listings/${listingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+      if (res.ok) {
+        setStatus("Saved", "is-saved");
+        setTimeout(() => setStatus("", null), 2400);
+      } else {
+        setStatus("Save failed", "is-error");
+      }
+    } catch {
+      setStatus("Network error", "is-error");
+    }
+  });
+
+  document.getElementById("delete-listing")?.addEventListener("click", async () => {
+    if (!confirm("Delete this listing? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`/api/listings/${listingId}`, { method: "DELETE" });
+      if (res.ok) {
+        window.location.href = "/listings";
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert("Failed to delete: " + (data.error || "Unknown error"));
+      }
+    } catch (err) {
+      alert("Error deleting: " + err.message);
+    }
+  });
+</script>

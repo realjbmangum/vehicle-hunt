@@ -1,0 +1,609 @@
+---
+import Layout from "../layouts/Layout.astro";
+import CompassCorner from "../components/CompassCorner.astro";
+import { HUNT } from "../../hunt.config";
+
+// NOTE: the reference content on this page — known issues, walk-aways, market
+// bands, inspection checklist — is Toyota Tacoma specific and is kept as a
+// worked example. Replace it with your own vehicle's research. Only the URLs
+// and the location below are generated from hunt.config.ts.
+const SLUG = `${HUNT.vehicle.make.toLowerCase()}/${HUNT.vehicle.model.toLowerCase()}`;
+const MODEL_Q = `make=${HUNT.vehicle.make.toLowerCase()}&model=${HUNT.vehicle.model.toLowerCase()}`;
+
+const walkAways = [
+  {
+    title: "Timing Cover Oil Leak",
+    severity: "stop",
+    symptom: "Slow oil weep from front of engine",
+    cost: "$3,000 – $6,000",
+    note: "If you see oil residue around the timing cover — walk away. Not negotiable.",
+  },
+  {
+    title: "Frame Rust",
+    severity: "stop",
+    symptom: "Visible rust on frame rails or crossmembers (esp. north/coastal trucks)",
+    cost: "Varies — often unrepairable",
+    note: "Tacomas have well-documented frame issues. A Carfax showing a northern winter is a yellow flag; visible rust is a red one.",
+  },
+  {
+    title: "Rear Differential Leak",
+    severity: "caution",
+    symptom: "Oil dripping from rear axle housing",
+    cost: "Recall fix — should be free",
+    note: "Confirm the recall has been completed via the VIN before signing.",
+  },
+  {
+    title: "Transmission Hesitation",
+    severity: "caution",
+    symptom: "Delayed shifts, hesitation under acceleration",
+    cost: "Free software update",
+    note: "Common complaint. Ask if the dealer has applied the latest TCM software.",
+  },
+  {
+    title: "Leaf Spring Sag",
+    severity: "caution",
+    symptom: "Rear sits visibly low; tail-heavy stance",
+    cost: "$400 – $800",
+    note: "Suggests the truck has spent its life loaded or towing. Inspect carefully.",
+  },
+];
+
+const checklistBefore = [
+  "Pull CARFAX or AutoCheck history",
+  "Check NHTSA recall status by VIN",
+  "Compare price to KBB Fair / Edmunds True Market",
+  "Verify dealer reviews — check Google + DealerRater",
+  `Map the dealer location vs. ${HUNT.location.zip}`,
+];
+const checklistDuring = [
+  "Crawl underneath — inspect frame for surface rust or pitting",
+  "Check timing cover area for oil seepage",
+  "Test all 4WD modes: 2H, 4H, 4L, locker if equipped",
+  "Drive 25+ minutes — test transmission under load and from cold",
+  "Inspect leaf springs for sag or aftermarket replacement",
+  "Confirm service records show TCM software update",
+  "Check for aftermarket suspension lift (changes drivetrain wear)",
+];
+const checklistSigning = [
+  "Independent pre-purchase inspection ($100–150 — non-negotiable)",
+  "Verify all open recalls completed",
+  "Negotiate based on any inspection findings",
+  "Pre-arrange financing through credit union (often beats dealer rates)",
+  "Confirm warranty status and any remaining factory coverage",
+];
+
+const market = [
+  { year: "2020", range: "$28,000 – $36,000", fit: "good", note: "Best value at budget" },
+  { year: "2021", range: "$30,000 – $38,000", fit: "good", note: "Sweet spot" },
+  { year: "2022", range: "$32,000 – $40,000", fit: "tight", note: "Lower trims fit budget" },
+  { year: "2023", range: "$34,000 – $42,000", fit: "stretch", note: "Stretch — higher mileage only" },
+];
+
+const checkpoints = [
+  {
+    name: "Carvana",
+    type: "No-haggle online",
+    bullets: ["Fixed prices, 7-day return", "Delivered to door", "150-pt inspection"],
+    href: `https://www.carvana.com/cars/${HUNT.vehicle.make.toLowerCase()}-${HUNT.vehicle.model.toLowerCase()}`,
+  },
+  {
+    name: "TrueCar",
+    type: "Pre-negotiated dealer",
+    bullets: ["See what others paid", "Upfront quotes locked in", "Test drive in-person"],
+    href: `https://www.truecar.com/used-cars-for-sale/listings/${SLUG}/`,
+  },
+  {
+    name: "CarMax",
+    type: "No-haggle dealer",
+    bullets: ["7-day return", "Available delivery", "Larger physical lot inventory"],
+    href: `https://www.carmax.com/cars/${SLUG}`,
+  },
+  {
+    name: "AutoTempest",
+    type: "Aggregator",
+    bullets: ["Indexes Carvana / CarMax / dealers", "Saved-search email alerts", "Filter by distance"],
+    href: `https://www.autotempest.com/results?${MODEL_Q}&zip=${HUNT.location.zip}&radius=${HUNT.location.radiusMiles}`,
+  },
+];
+
+const links = [
+  { name: "NHTSA Recalls", href: "https://www.nhtsa.gov/recalls", note: "Check VIN for open recalls" },
+  { name: `${HUNT.vehicle.model} owner forum`, href: "https://www.tacomaworld.com/", note: "Owner forums & real-world advice" },
+  { name: `KBB ${HUNT.vehicle.model}`, href: `https://www.kbb.com/${SLUG}/`, note: "Value estimates & pricing data" },
+  { name: `Edmunds ${HUNT.vehicle.model}`, href: `https://www.edmunds.com/${SLUG}/`, note: "Expert reviews & TCO calculator" },
+];
+---
+
+<Layout title={`Field Manual — ${HUNT.vehicle.label} Tracker`} eyebrow="Field Manual · Pre-Purchase Reference">
+
+  <header class="manual-head">
+    <div>
+      <h1 class="heading-xl manual-title">Field Manual</h1>
+      <p class="manual-sub">Reference document. Pre-drive checks, walk-away signals, market pricing, expedition checkpoints.</p>
+    </div>
+    <div class="manual-meta font-mono">REV 02 · MAY 2026</div>
+  </header>
+
+  <!-- WALK-AWAY SIGNALS -->
+  <section class="card walk-away-section grain">
+    <CompassCorner position="tr" />
+    <div class="section-head">
+      <h2>§ 01 · Walk-Away Signals</h2>
+      <span class="meta">DEAL-KILLERS</span>
+    </div>
+    <p class="section-intro">
+      Issues with documented repair costs that exceed reasonable negotiation. If you see these, the deal is dead — no matter how clean the paint looks.
+    </p>
+    <div class="walk-away-grid">
+      {walkAways.map((w) => (
+        <article class={`walk-away-card walk-away-card--${w.severity}`}>
+          <header class="wa-head">
+            <span class={`wa-severity wa-severity--${w.severity}`}>
+              {w.severity === "stop" ? "STOP" : "CAUTION"}
+            </span>
+            <h3 class="wa-title">{w.title}</h3>
+          </header>
+          <dl class="wa-body">
+            <dt>Symptom</dt><dd>{w.symptom}</dd>
+            <dt>Cost</dt><dd class="font-mono">{w.cost}</dd>
+            <dt>Note</dt><dd>{w.note}</dd>
+          </dl>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <!-- PRE-DRIVE CHECKLIST -->
+  <section class="card grain checklist-section">
+    <div class="section-head">
+      <h2>§ 02 · Pre-Drive Checklist</h2>
+      <span class="meta">FIELD INSPECTION</span>
+    </div>
+    <div class="checklist-grid">
+      <div class="checklist-block">
+        <h3 class="cl-block-head">Before You Go</h3>
+        <ul class="checklist">
+          {checklistBefore.map((item) => (
+            <li>
+              <input type="checkbox" /><span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="checklist-block">
+        <h3 class="cl-block-head">On The Lot</h3>
+        <ul class="checklist">
+          {checklistDuring.map((item) => (
+            <li>
+              <input type="checkbox" /><span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="checklist-block">
+        <h3 class="cl-block-head">Before Signing</h3>
+        <ul class="checklist">
+          {checklistSigning.map((item) => (
+            <li>
+              <input type="checkbox" /><span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARKET PRICING -->
+  <section class="card grain market-section">
+    <div class="section-head">
+      <h2>§ 03 · Market Pricing</h2>
+      <span class="meta">4WD · UNDER 50K MI · MAY 2026</span>
+    </div>
+    <div class="market-grid">
+      {market.map((row) => (
+        <article class={`market-row market-row--${row.fit}`}>
+          <span class="market-year font-display">{row.year}</span>
+          <span class="market-range font-mono">{row.range}</span>
+          <span class={`trail-marker market-fit market-fit--${row.fit}`} data-tone={row.fit === "good" ? "go" : row.fit === "tight" ? "caution" : "stop"}>{row.fit.toUpperCase()}</span>
+          <span class="market-note">{row.note}</span>
+        </article>
+      ))}
+    </div>
+    <p class="market-hint">Sweet spot: <strong>2020–2021 SR5 / TRD Off-Road</strong> at $30–34k with under 45k miles. That's where the budget-to-criteria ratio peaks.</p>
+  </section>
+
+  <!-- WHERE TO SEARCH -->
+  <section class="card grain checkpoint-section">
+    <div class="section-head">
+      <h2>§ 04 · Expedition Checkpoints</h2>
+      <span class="meta">WHERE TO SEARCH</span>
+    </div>
+    <div class="checkpoint-grid">
+      {checkpoints.map((c) => (
+        <a href={c.href} target="_blank" rel="noopener" class="checkpoint">
+          <div class="checkpoint-head">
+            <span class="checkpoint-pin"></span>
+            <h3 class="checkpoint-name">{c.name}</h3>
+            <span class="checkpoint-type">{c.type}</span>
+          </div>
+          <ul class="checkpoint-bullets">
+            {c.bullets.map((b) => <li>{b}</li>)}
+          </ul>
+          <span class="checkpoint-arrow">SEARCH →</span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- REFERENCE LINKS -->
+  <section class="card grain refs-section">
+    <div class="section-head">
+      <h2>§ 05 · Reference</h2>
+      <span class="meta">ADDITIONAL TOOLS</span>
+    </div>
+    <div class="refs-grid">
+      {links.map((l) => (
+        <a href={l.href} target="_blank" rel="noopener" class="ref-link">
+          <span class="ref-name">{l.name}</span>
+          <span class="ref-note">{l.note}</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9 L9 3 M9 3 H5 M9 3 V7" stroke-linecap="square" /></svg>
+        </a>
+      ))}
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .manual-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .manual-title {
+    font-size: 3rem;
+    text-transform: uppercase;
+    color: var(--color-bone);
+  }
+  .manual-sub {
+    color: var(--color-bone-mute);
+    margin-top: 8px;
+    max-width: 60ch;
+    line-height: 1.5;
+  }
+  .manual-meta {
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+    color: var(--color-coyote);
+  }
+
+  /* === Section common === */
+  section.card {
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .section-intro {
+    color: var(--color-bone-mute);
+    line-height: 1.55;
+    max-width: 70ch;
+    margin-bottom: 20px;
+  }
+
+  /* === WALK AWAY === */
+  .walk-away-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .walk-away-card {
+    position: relative;
+    padding: 16px 18px;
+    background: var(--color-base);
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+  }
+  .walk-away-card--stop {
+    background: color-mix(in oklch, var(--color-stop) 8%, var(--color-base));
+    border-color: color-mix(in oklch, var(--color-stop) 35%, var(--color-line));
+  }
+  .walk-away-card--caution {
+    background: color-mix(in oklch, var(--color-caution) 5%, var(--color-base));
+    border-color: color-mix(in oklch, var(--color-caution) 28%, var(--color-line));
+  }
+  .wa-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .wa-severity {
+    font-family: var(--font-display);
+    font-stretch: 70%;
+    font-weight: 800;
+    font-size: 0.625rem;
+    letter-spacing: 0.22em;
+    padding: 3px 8px;
+    flex-shrink: 0;
+  }
+  .wa-severity--stop { background: var(--color-stop); color: oklch(0.95 0.04 30); }
+  .wa-severity--caution { background: var(--color-caution); color: oklch(0.18 0.02 70); }
+  .wa-title {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    color: var(--color-bone);
+    margin: 0;
+  }
+  .wa-body {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+  .wa-body dt {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.625rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    align-self: start;
+    padding-top: 2px;
+  }
+  .wa-body dd { margin: 0; color: var(--color-bone-mute); }
+
+  /* === CHECKLIST === */
+  .checklist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+  }
+  .cl-block-head {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--color-line);
+  }
+  .checklist {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--color-bone-mute);
+  }
+  .checklist input[type="checkbox"] {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: 3px;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-base);
+    border-radius: 1px;
+    flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
+  }
+  .checklist input[type="checkbox"]:checked {
+    background: var(--color-rust);
+    border-color: var(--color-rust);
+  }
+  .checklist input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-bottom: 2px solid var(--color-base);
+    border-right: 2px solid var(--color-base);
+    transform: rotate(45deg) translate(0, -2px);
+    width: 4px;
+    height: 8px;
+    left: 3px;
+    top: 0;
+  }
+
+  /* === MARKET === */
+  .market-grid {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .market-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 90px 1fr;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px dashed var(--color-line-faint);
+  }
+  .market-row:last-child { border-bottom: none; }
+  .market-row:nth-child(odd) { background: color-mix(in oklch, var(--color-card-elev) 30%, transparent); }
+  .market-year {
+    font-stretch: 70%;
+    font-weight: 800;
+    font-size: 1.5rem;
+    color: var(--color-bone);
+    letter-spacing: -0.005em;
+  }
+  .market-range {
+    color: var(--color-bone-mute);
+    font-size: 0.875rem;
+  }
+  .market-note {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+  .market-hint {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: color-mix(in oklch, var(--color-rust) 12%, transparent);
+    border: 1px dashed color-mix(in oklch, var(--color-rust) 40%, transparent);
+    color: var(--color-bone);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: 2px;
+  }
+  .market-hint strong {
+    color: var(--color-rust-bright);
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 700;
+  }
+
+  /* === CHECKPOINTS === */
+  .checkpoint-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  .checkpoint {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px;
+    background: var(--color-base);
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 200ms ease;
+    position: relative;
+  }
+  .checkpoint:hover {
+    border-color: var(--color-rust);
+    background: color-mix(in oklch, var(--color-rust) 6%, var(--color-base));
+  }
+  .checkpoint-head { display: flex; align-items: center; gap: 10px; }
+  .checkpoint-pin {
+    width: 12px; height: 12px;
+    background: var(--color-rust);
+    border: 2px solid var(--color-base);
+    box-shadow: 0 0 0 1px var(--color-rust);
+    flex-shrink: 0;
+    clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  }
+  .checkpoint-name {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: var(--color-bone);
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  .checkpoint-type {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-coyote);
+    opacity: 0.8;
+  }
+  .checkpoint-bullets {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.8125rem;
+    color: var(--color-bone-mute);
+  }
+  .checkpoint-bullets li {
+    padding-left: 16px;
+    position: relative;
+  }
+  .checkpoint-bullets li::before {
+    content: "";
+    position: absolute;
+    left: 4px; top: 9px;
+    width: 4px; height: 1px;
+    background: var(--color-coyote);
+  }
+  .checkpoint-arrow {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-line);
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    color: var(--color-rust);
+  }
+
+  /* === REFS === */
+  .refs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+  }
+  .ref-link {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 2px 12px;
+    padding: 12px 14px;
+    background: var(--color-base);
+    border: 1px solid var(--color-line);
+    border-radius: 2px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 200ms ease;
+  }
+  .ref-link:hover {
+    border-color: var(--color-rust);
+    color: var(--color-bone);
+  }
+  .ref-link svg {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    color: var(--color-coyote);
+  }
+  .ref-name {
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 700;
+    font-size: 0.875rem;
+    letter-spacing: 0.04em;
+    color: var(--color-bone);
+  }
+  .ref-note {
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+
+  @media (max-width: 720px) {
+    .manual-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .manual-title { font-size: 2.25rem; }
+    section.card { padding: 22px 18px; }
+    .market-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .market-row .market-note { grid-column: 1 / -1; }
+  }
+</style>

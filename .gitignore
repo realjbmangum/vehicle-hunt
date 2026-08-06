@@ -1,0 +1,26 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+*-debug.log*
+
+# secrets and local config — NEVER commit these
+.env
+.env.*
+!.env.example
+.dev.vars
+wrangler.jsonc
+email-worker/wrangler.jsonc
+
+# wrangler local state
+.wrangler/
+
+# D1 exports
+backups/
+
+# macOS
+.DS_Store

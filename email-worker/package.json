@@ -1,0 +1,22 @@
+{
+  "name": "tacoma-tracker-email-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"tests/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail",
+    "migrate:remote": "wrangler d1 execute tacoma-tracker-db --remote --file=./migrations/0001_ingest.sql"
+  },
+  "dependencies": {
+    "postal-mime": "^2.4.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260201.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.50.0"
+  }
+}

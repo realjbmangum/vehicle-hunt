@@ -1,0 +1,298 @@
+---
+import "../styles/global.css";
+import { HUNT } from "../../hunt.config";
+
+interface Props {
+  title: string;
+  eyebrow?: string;
+}
+
+// Coordinates are optional — set them in hunt.config.ts to show a readout,
+// or leave them null and the header falls back to the ZIP alone.
+const coords = [
+  HUNT.location.zip,
+  HUNT.location.latitude !== null ? `${HUNT.location.latitude}N` : null,
+  HUNT.location.longitude !== null ? `${HUNT.location.longitude}W` : null,
+]
+  .filter(Boolean)
+  .join(" · ");
+
+const footTagline = [
+  `TARGET ${HUNT.criteria.yearMin}-${String(HUNT.criteria.yearMax).slice(2)}`,
+  `BUDGET ${Math.round(HUNT.criteria.maxPrice / 1000)}K`,
+  `${HUNT.location.radiusMiles}MI`,
+].join(" · ");
+
+const { title, eyebrow } = Astro.props;
+const pathname = Astro.url.pathname;
+const isActive = (path: string) =>
+  path === "/" ? pathname === "/" : pathname.startsWith(path);
+
+const today = new Date().toLocaleDateString("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+});
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <meta name="theme-color" content="#1c1a17" />
+  </head>
+  <body class="min-h-screen relative">
+    <!-- Topographic background, low opacity, fixed -->
+    <div class="topo-bg topo" aria-hidden="true"></div>
+
+    <header class="site-nav">
+      <div class="site-nav-inner">
+        <a href="/" class="brand">
+          <svg
+            class="brand-mark"
+            width="36"
+            height="20"
+            viewBox="0 0 36 20"
+            aria-hidden="true"
+          >
+            <path
+              d="M2 14 L8 6 L14 14 M14 14 L20 6 L26 14 M26 14 L32 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linejoin="bevel"
+              stroke-linecap="square"
+            />
+            <line x1="0" y1="18" x2="36" y2="18" stroke="currentColor" stroke-width="0.6" stroke-dasharray="1 2" opacity="0.6" />
+          </svg>
+          <div class="brand-text">
+            <span class="brand-line">{HUNT.vehicle.model.toUpperCase()} <span class="brand-version">v.02</span></span>
+            <span class="brand-sub">FIELD TRACKER · {HUNT.location.zip}</span>
+          </div>
+        </a>
+        <nav>
+          <a href="/" class:list={["nav-link", isActive("/") && "is-active"]}>
+            Dashboard
+          </a>
+          <a href="/listings" class:list={["nav-link", isActive("/listings") && "is-active"]}>
+            Listings
+          </a>
+          <a href="/research" class:list={["nav-link", isActive("/research") && "is-active"]}>
+            Field Manual
+          </a>
+        </nav>
+        <div class="day-stamp" aria-hidden="true">
+          <span class="day-eyebrow">DAY</span>
+          <span class="day-value">{today}</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="site-main">
+      {eyebrow && (
+        <div class="page-eyebrow">
+          <span class="eyebrow-coord">{coords}</span>
+          <span class="eyebrow-text">{eyebrow}</span>
+        </div>
+      )}
+      <slot />
+    </main>
+
+    <footer class="site-foot">
+      <div class="site-foot-inner">
+        <span class="foot-coord">{HUNT.location.label}</span>
+        <span class="foot-tagline">{footTagline}</span>
+        <span class="foot-version">REV 02</span>
+      </div>
+    </footer>
+
+    <style>
+      .topo-bg {
+        position: fixed;
+        inset: 0;
+        opacity: 0.04;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .site-nav {
+        position: relative;
+        z-index: 10;
+        border-bottom: 1px solid var(--color-line);
+        background: color-mix(in oklch, var(--color-base) 92%, transparent);
+        backdrop-filter: blur(6px);
+      }
+      .site-nav-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 14px 24px;
+        display: flex;
+        align-items: center;
+        gap: 32px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--color-rust);
+        text-decoration: none;
+      }
+      .brand-mark { color: var(--color-rust); }
+      .brand-line {
+        font-family: var(--font-display);
+        font-stretch: 75%;
+        font-weight: 800;
+        font-size: 1.125rem;
+        letter-spacing: 0.12em;
+        color: var(--color-bone);
+        line-height: 1;
+      }
+      .brand-version {
+        font-family: var(--font-mono);
+        font-size: 0.625rem;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+        color: var(--color-rust);
+        margin-left: 4px;
+        vertical-align: 1px;
+      }
+      .brand-sub {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 0.625rem;
+        letter-spacing: 0.22em;
+        color: var(--color-coyote);
+        margin-top: 2px;
+      }
+      nav {
+        display: flex;
+        gap: 4px;
+        margin-left: auto;
+      }
+      .nav-link {
+        font-family: var(--font-display);
+        font-stretch: 80%;
+        font-weight: 600;
+        font-size: 0.8125rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--color-bone-mute);
+        padding: 8px 14px;
+        border-radius: 2px;
+        text-decoration: none;
+        position: relative;
+        transition: color 200ms ease;
+      }
+      .nav-link:hover { color: var(--color-bone); }
+      .nav-link.is-active {
+        color: var(--color-bone);
+        background: var(--color-card-elev);
+      }
+      .nav-link.is-active::after {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 2px;
+        height: 1px;
+        background: var(--color-rust);
+      }
+      .day-stamp {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        line-height: 1;
+        padding-left: 16px;
+        border-left: 1px solid var(--color-line);
+      }
+      .day-eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.5625rem;
+        letter-spacing: 0.22em;
+        color: var(--color-coyote);
+        opacity: 0.7;
+      }
+      .day-value {
+        font-family: var(--font-display);
+        font-stretch: 75%;
+        font-weight: 700;
+        font-size: 0.8125rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--color-bone);
+        margin-top: 4px;
+      }
+      .site-main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 32px 24px 64px;
+        position: relative;
+        z-index: 1;
+      }
+      .page-eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--color-line-faint);
+      }
+      .eyebrow-coord {
+        font-family: var(--font-mono);
+        font-size: 0.6875rem;
+        letter-spacing: 0.1em;
+        color: var(--color-coyote);
+        opacity: 0.75;
+      }
+      .eyebrow-text {
+        font-family: var(--font-display);
+        font-stretch: 75%;
+        font-weight: 600;
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--color-bone-mute);
+      }
+      .site-foot {
+        position: relative;
+        z-index: 1;
+        margin-top: 64px;
+        padding: 24px 0;
+        border-top: 1px solid var(--color-line);
+      }
+      .site-foot-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        font-family: var(--font-mono);
+        font-size: 0.625rem;
+        letter-spacing: 0.18em;
+        color: var(--color-coyote);
+        opacity: 0.7;
+        text-transform: uppercase;
+      }
+
+      @media (max-width: 768px) {
+        .site-nav-inner {
+          flex-wrap: wrap;
+          padding: 12px 16px;
+          gap: 12px;
+        }
+        nav { width: 100%; order: 3; justify-content: flex-start; flex-wrap: wrap; gap: 2px; }
+        .nav-link { padding: 6px 10px; font-size: 0.75rem; }
+        .day-stamp { display: none; }
+        .site-main { padding: 20px 16px 48px; }
+        .page-eyebrow { flex-wrap: wrap; gap: 8px; }
+        .eyebrow-coord { font-size: 0.625rem; }
+        .eyebrow-text { font-size: 0.6875rem; }
+        .site-foot-inner { flex-wrap: wrap; gap: 8px; padding: 0 16px; font-size: 0.5625rem; }
+      }
+    </style>
+  </body>
+</html>

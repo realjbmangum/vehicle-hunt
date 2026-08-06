@@ -1,0 +1,402 @@
+---
+import DistanceBadge from "./DistanceBadge.astro";
+import type { Listing, ScoreBreakdown } from "../lib/dealScore";
+import { listingLink } from "../lib/links";
+
+interface Props {
+  listing: Listing & { score: ScoreBreakdown };
+}
+const { listing: l } = Astro.props;
+
+const sourceLabel = (l as any).source
+  ? String((l as any).source).split(",")[0].toUpperCase()
+  : null;
+
+const status = l.status || "watching";
+
+/** photos column is a JSON array of URLs; tolerate a bare string too. */
+function firstPhoto(photos: any): string | null {
+  if (!photos) return null;
+  try {
+    const arr = JSON.parse(photos);
+    if (Array.isArray(arr) && arr.length && typeof arr[0] === "string") {
+      return /^(https?:\/\/|\/img\/)/.test(arr[0]) ? arr[0] : null;
+    }
+  } catch {
+    if (typeof photos === "string" && /^(https?:\/\/|\/img\/)/.test(photos)) return photos;
+  }
+  return null;
+}
+const photo = firstPhoto((l as any).photos);
+const link = listingLink(l as any);
+
+// Drivetrain is shown exactly as recorded. An unknown is labelled UNK in
+// warning colour — never silently rendered as 4WD.
+const drivetrain = (l.drivetrain || "").toUpperCase();
+const driveLabel = drivetrain || "UNK";
+const driveUnknown = !drivetrain;
+
+const statusTone =
+  status === "watching" ? "sage" :
+  status === "contacted" ? "caution" :
+  status === "scheduled" ? "rust" :
+  status === "visited" ? "rust" :
+  status === "bought" ? "go" :
+  "stop";
+---
+
+<article class="lcard rise" data-id={l.id} data-price={l.price} data-score={l.score.total} data-status={status}>
+  <div class="lcard-visual">
+    {photo ? (
+      <img class="lcard-photo" src={photo} alt={`${l.year} Tacoma ${l.trim || ""}`.trim()} loading="lazy" decoding="async" />
+    ) : (
+      <div class="lcard-nophoto" aria-label="No photo in the alert email">
+        <svg viewBox="0 0 64 44" width="100%" height="100%" role="img" aria-hidden="true">
+          <g fill="none" stroke="var(--color-sage)" stroke-opacity="0.35" stroke-width="0.6">
+            <circle cx="32" cy="22" r="19" />
+            <circle cx="32" cy="22" r="12" />
+            <circle cx="32" cy="22" r="5" />
+          </g>
+          <g transform="translate(32 22)">
+            <g transform="translate(-16 -5)" fill="var(--color-coyote)" fill-opacity="0.7">
+              <path d="M 2 7 L 2 4 L 6 4 L 9 0 L 18 0 L 19.5 2 L 28 2 L 30 4 L 31 7 Z" />
+              <circle cx="7" cy="7.5" r="2" fill="var(--color-base)" stroke="var(--color-coyote)" stroke-width="0.5" />
+              <circle cx="25" cy="7.5" r="2" fill="var(--color-base)" stroke="var(--color-coyote)" stroke-width="0.5" />
+            </g>
+          </g>
+        </svg>
+        <span class="lcard-nophoto-label font-mono">NO IMG</span>
+      </div>
+    )}
+  </div>
+
+  <div class="lcard-stamp">
+    <div class="stamp" data-grade={l.score.grade}>
+      <span style="font-size:1.5rem;line-height:1">{l.score.grade}</span>
+      <span style="font-size:0.5625rem;font-family:var(--font-mono);letter-spacing:0.16em;opacity:0.7;margin-top:2px">{l.score.total}</span>
+    </div>
+  </div>
+
+  <div class="lcard-body">
+    <div class="lcard-titleline">
+      <h3 class="lcard-title">
+        <span class="lcard-year">{l.year}</span>
+        <span class="lcard-trim">{l.trim || "Tacoma"}</span>
+      </h3>
+      <div class="lcard-meta-pills">
+        {sourceLabel && <span class="source-tag">{sourceLabel}</span>}
+        <span class="trail-marker" data-tone={statusTone}>{status}</span>
+      </div>
+    </div>
+
+    {typeof l.accident_count === "number" && l.accident_count > 0 && (
+      <div class="lcard-accident">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M7 1.5 L13 12 L1 12 Z" stroke-linejoin="round" />
+          <path d="M7 5.5 V8.5" stroke-linecap="round" />
+          <circle cx="7" cy="10.2" r="0.7" fill="currentColor" stroke="none" />
+        </svg>
+        <span>
+          {l.accident_count} ACCIDENT{l.accident_count === 1 ? "" : "S"} REPORTED
+        </span>
+        <span class="lcard-accident-pts font-mono">
+          &minus;{l.accident_count >= 3 ? 35 : l.accident_count === 2 ? 25 : 15} PTS
+        </span>
+      </div>
+    )}
+
+    <div class="lcard-stats">
+      <div class="lcard-stat">
+        <span class="lcard-stat-value font-mono">{l.price ? `$${l.price.toLocaleString()}` : "CALL"}</span>
+        <span class="lcard-stat-label">PRICE</span>
+      </div>
+      <div class="lcard-divider" aria-hidden="true"></div>
+      <div class="lcard-stat">
+        <span class="lcard-stat-value font-mono">{l.mileage ? l.mileage.toLocaleString() : "—"}</span>
+        <span class="lcard-stat-label">MILES</span>
+      </div>
+      <div class="lcard-divider" aria-hidden="true"></div>
+      <div class="lcard-stat">
+        <span class="lcard-stat-value font-mono" data-unknown={driveUnknown}>{driveLabel}</span>
+        <span class="lcard-stat-label">DRIVE</span>
+      </div>
+      <div class="lcard-divider" aria-hidden="true"></div>
+      <div class="lcard-stat">
+        <span class="lcard-stat-value font-mono" data-unknown={!l.cab_type}>{l.cab_type ? l.cab_type.split(" ")[0].toUpperCase() : "UNK"}</span>
+        <span class="lcard-stat-label">CAB</span>
+      </div>
+    </div>
+
+    <div class="lcard-locator">
+      <DistanceBadge city={l.dealer_location} miles={l.dealer_location ? 32 : null} fallback={l.dealer_name || null} />
+      {l.dealer_name && l.dealer_location && (
+        <span class="lcard-dealer">{l.dealer_name}</span>
+      )}
+    </div>
+  </div>
+
+  <div class="lcard-actions">
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener"
+      class="lcard-icon-btn"
+      data-exact={link.isExact}
+      aria-label={link.label}
+      title={link.label}
+    >
+      {link.isExact ? (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 11 L11 3 M11 3 H6 M11 3 V8" stroke-linecap="square" /></svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="4" /><path d="M9 9 L12.5 12.5" stroke-linecap="square" /></svg>
+      )}
+    </a>
+    <a href={`/listings/${l.id}`} class="btn btn-ghost lcard-detail-btn">Notes →</a>
+  </div>
+</article>
+
+<style>
+  .lcard {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: center;
+    gap: 20px;
+    background: var(--color-card);
+    border: 1px solid var(--color-line);
+    padding: 18px 24px 18px 20px;
+    border-radius: 3px;
+    transition: border-color 200ms ease, transform 200ms ease;
+  }
+  .lcard:hover {
+    border-color: var(--color-line-strong);
+    transform: translateY(-1px);
+  }
+  .lcard::before {
+    content: "";
+    position: absolute;
+    top: -1px; bottom: -1px;
+    left: -1px;
+    width: 3px;
+    background: transparent;
+  }
+  .lcard-stamp { flex-shrink: 0; }
+  .lcard-body { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+  .lcard-visual {
+    position: relative;
+    width: 132px;
+    aspect-ratio: 4 / 3;
+    flex-shrink: 0;
+    border: 1px solid var(--color-line);
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--color-base);
+  }
+  .lcard-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: saturate(0.92) contrast(1.04);
+  }
+  .lcard:hover .lcard-photo { filter: saturate(1) contrast(1.04); }
+  .lcard-nophoto {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 12px 16px;
+    background: radial-gradient(
+      ellipse at center,
+      color-mix(in oklch, var(--color-sage) 10%, var(--color-base)) 0%,
+      var(--color-base) 78%
+    );
+  }
+  .lcard-nophoto-label {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-size: 0.5rem;
+    letter-spacing: 0.14em;
+    color: var(--color-coyote);
+    opacity: 0.55;
+  }
+
+  /* An unverified value must never look like a confirmed one. */
+  .lcard-stat-value[data-unknown="true"] {
+    color: var(--color-caution, var(--color-coyote));
+    opacity: 0.85;
+  }
+
+  /* Accident banner — deliberately NOT a trail-marker pill. Accident history
+     is the one thing on this card that should stop the eye while scanning,
+     so it gets its own full-width red bar rather than blending into the row
+     of status chips. */
+  .lcard-accident {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 10px 0 0;
+    padding: 7px 10px;
+    border: 1px solid color-mix(in oklch, var(--color-stop) 55%, transparent);
+    border-left: 3px solid var(--color-stop);
+    background: color-mix(in oklch, var(--color-stop) 14%, var(--color-card-elev));
+    color: oklch(0.82 0.16 28);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.09em;
+    font-weight: 600;
+  }
+  .lcard-accident svg { flex-shrink: 0; }
+  .lcard-accident-pts { margin-left: auto; opacity: 0.85; }
+
+  .lcard-titleline {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .lcard-title {
+    margin: 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+    line-height: 1;
+  }
+  .lcard-year {
+    font-family: var(--font-display);
+    font-stretch: 70%;
+    font-weight: 800;
+    font-size: 1.625rem;
+    letter-spacing: -0.005em;
+    color: var(--color-bone);
+  }
+  .lcard-trim {
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+    color: var(--color-bone-mute);
+    text-transform: uppercase;
+  }
+
+  .lcard-meta-pills {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .source-tag {
+    font-family: var(--font-mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.16em;
+    color: var(--color-coyote);
+    padding: 2px 6px;
+    background: color-mix(in oklch, var(--color-coyote) 14%, transparent);
+    border-radius: 1px;
+  }
+
+  .lcard-stats {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .lcard-stat {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+    min-width: 0;
+  }
+  .lcard-stat-value {
+    font-size: 1.125rem;
+    color: var(--color-bone);
+    font-weight: 600;
+  }
+  .lcard-stat-label {
+    font-family: var(--font-display);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.5625rem;
+    letter-spacing: 0.18em;
+    color: var(--color-coyote);
+    margin-top: 6px;
+    opacity: 0.75;
+  }
+  .lcard-divider {
+    width: 1px;
+    background: var(--color-line);
+    align-self: stretch;
+  }
+
+  .lcard-locator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .lcard-dealer {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    color: var(--color-bone-mute);
+  }
+  .lcard-dealer::before { content: "@ "; opacity: 0.5; }
+
+  .lcard-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .lcard-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    color: var(--color-coyote);
+    border: 1px solid var(--color-line);
+    border-radius: 2px;
+    transition: all 200ms ease;
+  }
+  .lcard-icon-btn:hover {
+    color: var(--color-rust);
+    border-color: var(--color-rust);
+  }
+  /* A search fallback must not read as the real ad. */
+  .lcard-icon-btn[data-exact="false"] {
+    color: var(--color-coyote);
+    border-style: dashed;
+    opacity: 0.75;
+  }
+  .lcard-icon-btn[data-exact="false"]:hover { opacity: 1; }
+  .lcard-detail-btn { padding: 8px 14px; font-size: 0.75rem; }
+
+  @media (max-width: 720px) {
+    .lcard {
+      grid-template-columns: auto auto 1fr;
+      grid-template-areas: "visual stamp body" "actions actions actions";
+      padding: 16px 18px;
+      gap: 14px;
+    }
+    .lcard-visual { grid-area: visual; width: 84px; align-self: start; }
+    .lcard-stamp { grid-area: stamp; }
+    .lcard-body { grid-area: body; }
+  }
+
+  /* On the narrowest phones the photo costs more than it tells you. */
+  @media (max-width: 460px) {
+    .lcard {
+      grid-template-columns: auto 1fr;
+      grid-template-areas: "stamp body" "actions actions";
+    }
+    .lcard-visual { display: none; }
+    .lcard-actions { grid-area: actions; justify-content: flex-end; padding-top: 8px; border-top: 1px dashed var(--color-line-faint); }
+    .lcard-stats { gap: 10px; flex-wrap: wrap; }
+    .lcard-stat-value { font-size: 1rem; }
+    .lcard-divider:nth-of-type(3) { display: none; }
+  }
+</style>

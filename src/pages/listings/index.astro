@@ -1,0 +1,363 @@
+---
+import { HUNT } from "../../../hunt.config";
+import Layout from "../../layouts/Layout.astro";
+import ListingCard from "../../components/ListingCard.astro";
+import { calculateDealScore, type Listing } from "../../lib/dealScore";
+
+let rawListings: Listing[] = [];
+try {
+  const db = (Astro.locals as any).runtime?.env?.DB;
+  if (db) {
+    const result = await db
+      .prepare("SELECT * FROM listings ORDER BY updated_at DESC")
+      .all();
+    rawListings = (result.results || []) as Listing[];
+  }
+} catch (e) {
+  // D1 not available
+}
+
+const scored = rawListings
+  .map((l) => ({ ...l, score: calculateDealScore(l) }))
+  .sort((a, b) => b.score.total - a.score.total);
+
+const active = scored.filter((l) => !["pass", "bought"].includes(l.status || ""));
+const passed = scored.filter((l) => ["pass", "bought"].includes(l.status || ""));
+
+const groupA = active.filter((l) => l.score.grade === "A");
+const groupB = active.filter((l) => l.score.grade === "B");
+const groupC = active.filter((l) => l.score.grade === "C");
+const skipped = active.filter((l) => ["D", "F"].includes(l.score.grade));
+
+const totalActive = active.length;
+
+const statusOptions = ["watching", "contacted", "scheduled", "visited", "pass", "bought"] as const;
+---
+
+<Layout title="Listings — Tacoma Field Tracker" eyebrow="Inventory · All Candidates">
+
+  <div class="page-head">
+    <div>
+      <h1 class="heading-xl page-title">All Listings</h1>
+      <p class="page-sub">{scored.length} tracked · {totalActive} active in pipeline</p>
+    </div>
+    <div class="page-actions">
+      <div class="sort-pills" role="group" aria-label="Sort listings">
+        <button class="sort-pill active" data-sort="grade">By Grade</button>
+        <button class="sort-pill" data-sort="price">By Price</button>
+        <button class="sort-pill" data-sort="date">By Date</button>
+        <button class="sort-pill" data-sort="status">By Status</button>
+      </div>
+      <a href="/listings/new" class="btn btn-primary add-btn">+ Add</a>
+    </div>
+  </div>
+
+  <!-- Filter strip — grade chips -->
+  <div class="filter-strip" role="tablist">
+    <button class="filter-btn active" data-filter="all" role="tab" aria-selected="true">
+      <span class="ftab-label">ALL</span>
+      <span class="ftab-count font-mono">{String(active.length).padStart(2, "0")}</span>
+    </button>
+    <button class="filter-btn" data-filter="A" role="tab"><span class="ftab-label">Grade A</span><span class="ftab-count font-mono">{String(groupA.length).padStart(2, "0")}</span></button>
+    <button class="filter-btn" data-filter="B" role="tab"><span class="ftab-label">Grade B</span><span class="ftab-count font-mono">{String(groupB.length).padStart(2, "0")}</span></button>
+    <button class="filter-btn" data-filter="C" role="tab"><span class="ftab-label">Grade C</span><span class="ftab-count font-mono">{String(groupC.length).padStart(2, "0")}</span></button>
+    <button class="filter-btn" data-filter="skipped" role="tab"><span class="ftab-label">Skipped</span><span class="ftab-count font-mono">{String(skipped.length).padStart(2, "0")}</span></button>
+    {passed.length > 0 && (
+      <button class="filter-btn filter-btn--passed" data-filter="passed" role="tab"><span class="ftab-label">Passed</span><span class="ftab-count font-mono">{String(passed.length).padStart(2, "0")}</span></button>
+    )}
+  </div>
+
+  {scored.length === 0 ? (
+    <section class="card grain empty-state">
+      <h2 class="heading-lg" style="font-size:1.5rem;color:var(--color-bone)">No listings yet</h2>
+      <p style="color:var(--color-bone-mute);margin-top:6px;max-width:50ch">Email alerts are wired up. As saved-search alerts hit <span class="font-mono" style="color:var(--color-coyote)">{HUNT.notify.ingestEmail}</span>, parsed listings will land here automatically.</p>
+      <a href="/listings/new" class="btn btn-primary" style="margin-top:18px">+ Add One Manually</a>
+    </section>
+  ) : (
+    <>
+      {groupA.length > 0 && (
+        <section class="grade-block" data-block="A">
+          <header class="grade-block-head">
+            <span class="grade-tag" data-grade="A">A</span>
+            <span class="eyebrow">Act on these</span>
+            <span class="grade-rule"></span>
+            <span class="font-mono grade-count">{String(groupA.length).padStart(2, "0")} CANDIDATES</span>
+          </header>
+          <div class="cards">
+            {groupA.map((l) => <ListingCard listing={l} />)}
+          </div>
+        </section>
+      )}
+
+      {groupB.length > 0 && (
+        <section class="grade-block" data-block="B">
+          <header class="grade-block-head">
+            <span class="grade-tag" data-grade="B">B</span>
+            <span class="eyebrow">Worth a look</span>
+            <span class="grade-rule"></span>
+            <span class="font-mono grade-count">{String(groupB.length).padStart(2, "0")} CANDIDATES</span>
+          </header>
+          <div class="cards">
+            {groupB.map((l) => <ListingCard listing={l} />)}
+          </div>
+        </section>
+      )}
+
+      {groupC.length > 0 && (
+        <section class="grade-block" data-block="C">
+          <header class="grade-block-head">
+            <span class="grade-tag" data-grade="C">C</span>
+            <span class="eyebrow">Marginal</span>
+            <span class="grade-rule"></span>
+            <span class="font-mono grade-count">{String(groupC.length).padStart(2, "0")} CANDIDATES</span>
+          </header>
+          <div class="cards">
+            {groupC.map((l) => <ListingCard listing={l} />)}
+          </div>
+        </section>
+      )}
+
+      {skipped.length > 0 && (
+        <details class="grade-block grade-block--skipped" data-block="skipped">
+          <summary class="grade-block-head" style="cursor:pointer">
+            <span class="grade-tag" data-grade="D">D/F</span>
+            <span class="eyebrow" style="color:var(--color-muted)">Skipped — outside criteria</span>
+            <span class="grade-rule"></span>
+            <span class="font-mono grade-count">{String(skipped.length).padStart(2, "0")} HIDDEN</span>
+          </summary>
+          <div class="cards" style="margin-top:16px">
+            {skipped.map((l) => <ListingCard listing={l} />)}
+          </div>
+        </details>
+      )}
+
+      {passed.length > 0 && (
+        <details class="grade-block grade-block--passed" data-block="passed">
+          <summary class="grade-block-head" style="cursor:pointer">
+            <span class="grade-tag grade-tag--passed">—</span>
+            <span class="eyebrow" style="color:var(--color-muted)">Passed — no longer in hunt</span>
+            <span class="grade-rule"></span>
+            <span class="font-mono grade-count">{String(passed.length).padStart(2, "0")} HIDDEN</span>
+          </summary>
+          <div class="cards" style="margin-top:16px">
+            {passed.map((l) => <ListingCard listing={l} />)}
+          </div>
+        </details>
+      )}
+    </>
+  )}
+</Layout>
+
+<!-- ListingCard component, inlined for now -->
+<script define:vars={{}}></script>
+
+<style>
+  .page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .page-title {
+    font-size: 3rem;
+    color: var(--color-bone);
+    text-transform: uppercase;
+  }
+  .page-sub {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-coyote);
+    letter-spacing: 0.06em;
+    margin-top: 6px;
+  }
+  .page-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .sort-pills {
+    display: inline-flex;
+    border: 1px solid var(--color-line);
+    border-radius: 3px;
+    background: var(--color-base);
+    overflow: hidden;
+  }
+  .sort-pill {
+    background: transparent;
+    border: none;
+    padding: 8px 14px;
+    color: var(--color-bone-mute);
+    font-family: var(--font-display);
+    font-stretch: 80%;
+    font-weight: 600;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    border-right: 1px solid var(--color-line);
+    transition: all 200ms ease;
+  }
+  .sort-pill:last-child { border-right: none; }
+  .sort-pill:hover { color: var(--color-bone); background: color-mix(in oklch, var(--color-card-elev) 50%, transparent); }
+  .sort-pill.active {
+    background: var(--color-rust);
+    color: oklch(0.16 0.01 50);
+    border-color: var(--color-rust-bright);
+  }
+  .add-btn { padding: 9px 16px; font-size: 0.75rem; }
+
+  /* === FILTER FOLDER TABS === */
+  .filter-strip {
+    display: flex;
+    gap: 0;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--color-line);
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    padding: 10px 20px 12px;
+    color: var(--color-bone-mute);
+    cursor: pointer;
+    font-family: var(--font-display);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: -1px;
+    border-radius: 2px 2px 0 0;
+    transition: all 200ms ease;
+  }
+  .filter-btn:hover { color: var(--color-bone); background: color-mix(in oklch, var(--color-card-elev) 50%, transparent); }
+  .filter-btn.active {
+    background: var(--color-card);
+    border-color: var(--color-line);
+    color: var(--color-bone);
+    border-bottom-color: var(--color-card);
+  }
+  .filter-btn.active::before {
+    content: "";
+    position: absolute;
+    height: 2px;
+    background: var(--color-rust);
+    left: -1px;
+    right: -1px;
+    top: -1px;
+  }
+  .filter-btn { position: relative; }
+  .ftab-label {
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+  }
+  .ftab-count {
+    font-size: 0.625rem;
+    color: var(--color-coyote);
+    opacity: 0.8;
+    letter-spacing: 0.05em;
+  }
+
+  .empty-state {
+    padding: 64px 32px;
+    text-align: center;
+  }
+
+  /* === GRADE BLOCK === */
+  .grade-block { margin-bottom: 32px; }
+  .grade-block[open] > .grade-block-head { color: var(--color-bone); }
+  .grade-block-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    list-style: none;
+  }
+  .grade-block-head::-webkit-details-marker { display: none; }
+  .grade-tag {
+    font-family: var(--font-display);
+    font-stretch: 70%;
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    width: 48px; height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    clip-path: polygon(14% 0, 86% 0, 100% 14%, 100% 86%, 86% 100%, 14% 100%, 0 86%, 0 14%);
+  }
+  .grade-tag[data-grade="A"] { background: color-mix(in oklch, var(--color-go) 26%, var(--color-card-elev)); color: oklch(0.92 0.13 145); }
+  .grade-tag[data-grade="B"] { background: color-mix(in oklch, var(--color-coyote) 36%, var(--color-card-elev)); color: oklch(0.94 0.10 90); }
+  .grade-tag[data-grade="C"] { background: color-mix(in oklch, var(--color-caution) 28%, var(--color-card-elev)); color: oklch(0.93 0.13 80); }
+  .grade-tag[data-grade="D"] { background: color-mix(in oklch, var(--color-rust) 30%, var(--color-card-elev)); color: oklch(0.90 0.13 50); }
+  .grade-tag--passed { background: color-mix(in oklch, var(--color-line-strong) 60%, var(--color-card-elev)); color: var(--color-muted); font-size: 1rem; }
+  .filter-btn--passed .ftab-label { color: var(--color-muted); }
+  .grade-rule {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--color-line-strong), transparent);
+  }
+  .grade-count {
+    font-size: 0.6875rem;
+    color: var(--color-coyote);
+    letter-spacing: 0.1em;
+    opacity: 0.85;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+</style>
+
+<script>
+  const filterBtns = document.querySelectorAll<HTMLButtonElement>(".filter-btn");
+  const blocks = document.querySelectorAll<HTMLElement>(".grade-block");
+
+  filterBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const filter = btn.dataset.filter;
+      filterBtns.forEach((b) => {
+        b.classList.toggle("active", b === btn);
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+
+      blocks.forEach((block) => {
+        const blockKey = block.dataset.block;
+        const show = filter === "all" || filter === blockKey;
+        block.style.display = show ? "" : "none";
+        if (block.tagName === "DETAILS" && (filter === blockKey)) {
+          (block as HTMLDetailsElement).open = true;
+        }
+      });
+    });
+  });
+
+  // Sort pills — re-order cards within each visible block
+  const sortPills = document.querySelectorAll<HTMLButtonElement>(".sort-pill");
+  sortPills.forEach((pill) => {
+    pill.addEventListener("click", () => {
+      const sort = pill.dataset.sort;
+      sortPills.forEach((p) => p.classList.toggle("active", p === pill));
+
+      blocks.forEach((block) => {
+        const cardsContainer = block.querySelector<HTMLElement>(".cards");
+        if (!cardsContainer) return;
+        const cards = Array.from(cardsContainer.querySelectorAll<HTMLElement>(".lcard"));
+        cards.sort((a, b) => {
+          const ad = a.dataset, bd = b.dataset;
+          if (sort === "price") return Number(ad.price ?? 0) - Number(bd.price ?? 0);
+          if (sort === "date") return Number(bd.id ?? 0) - Number(ad.id ?? 0);
+          if (sort === "status") return (ad.status ?? "").localeCompare(bd.status ?? "");
+          return Number(bd.score ?? 0) - Number(ad.score ?? 0); // grade default
+        });
+        cards.forEach((c) => cardsContainer.appendChild(c));
+      });
+    });
+  });
+</script>

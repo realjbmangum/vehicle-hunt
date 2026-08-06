@@ -1,0 +1,49 @@
+// Copy to wrangler.jsonc and fill in your own values. wrangler.jsonc is
+// gitignored so your database IDs and addresses stay out of the repo.
+{
+  "name": "vehicle-hunt-ingest",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-02-04",
+  "compatibility_flags": ["nodejs_compat_v2"],
+
+  // Cloudflare Email Routing sends inbound mail to this worker, and the
+  // digest goes back out through the same binding. The destination address
+  // must be verified in the Cloudflare dashboard first.
+  "send_email": [{ "name": "FORWARD" }],
+
+  // Vehicle photos are copied here so they survive the listing being
+  // delisted. Create with: wrangler r2 bucket create vehicle-hunt-photos
+  "r2_buckets": [{ "binding": "PHOTOS", "bucket_name": "vehicle-hunt-photos" }],
+
+  // Create with: wrangler d1 create vehicle-hunt-db
+  // then paste the printed database_id here.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vehicle-hunt-db",
+      "database_id": "PASTE_YOUR_DATABASE_ID_HERE"
+    }
+  ],
+
+  // Daily sweep + digest. 0 11 * * * is 7am US Eastern. Set to [] to disable.
+  "triggers": {
+    "crons": ["0 11 * * *"]
+  },
+
+  "observability": { "enabled": true },
+
+  // These override the matching values in hunt.config.ts, so one deployment
+  // can widen its radius without a rebuild. Everything else — vehicle, price,
+  // year range, scoring — lives in hunt.config.ts.
+  "vars": {
+    "BUYER_EMAIL": "you@example.com",
+    "DIGEST_FROM": "hunt@example.com",
+    "BUYER_ZIP": "00000",
+    "MAX_DIST_MILES": "100"
+  }
+
+  // Secrets are NOT set here. Use wrangler secret put for each:
+  //   wrangler secret put ANTHROPIC_API_KEY   (required — parses inbound email)
+  //   wrangler secret put TRIGGER_TOKEN       (required — guards /digest, /sweep, /replay)
+  //   wrangler secret put AUTODEV_API_KEY     (optional — enables the inventory sweep)
+}
